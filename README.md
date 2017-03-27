@@ -5,4 +5,3 @@
 - Added ThunderX Governer.
 - Added ThunderQuake Engine to control Vibration intensity.
 - Minor Fixes for Smoothness.
-# Sources MESSED UP will Fix tomorrow morning!(IST){26 March 2017}
