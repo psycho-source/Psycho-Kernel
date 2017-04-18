@@ -6,7 +6,7 @@ os:
 before_install:
   - sudo apt-get update -y
   - sudo apt-get install libncurses5-dev
-  - sudo apt-get install git automake lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib python-networkx libxml2-utils libgl1-mesa-glx:i386 libgl1-mesa-dev bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven
+  - sudo apt-get install git automake lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib python-networkx libxml2-utils libgl1-mesa-glx:i386 libgl1-mesa-dev bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev make optipng maven
   - sudo ln -s /usr/lib/i386-linux-gnu/mesa/libGL.so.1 /usr/lib/i386-linux-gnu/libGL.so
   - sudo apt-get install -y ccache &&echo 'export PATH="/usr/lib/ccache:$PATH"' | tee -a ~/.bashrc &&source ~/.bashrc && echo $PATH
   - export USE_CCACHE=1
