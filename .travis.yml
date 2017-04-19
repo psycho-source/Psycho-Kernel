@@ -1,31 +1,31 @@
 language: c
-
 dist: trusty
-
 sudo: required
-
 os:
-  - linux
-
+- linux
 before_install:
-  - sudo apt-get update -y
-  - sudo apt-get install git automake lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib python-networkx libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven openjdk-8-jdk
-  - sudo apt-get install -y ccache &&echo 'export PATH="/usr/lib/ccache:$PATH"' | tee -a ~/.bashrc &&source ~/.bashrc && echo $PATH
-  - export USE_CCACHE=1
-
+- sudo apt-get update -y
+- sudo apt-get install git automake lzop bison gperf build-essential zip curl zlib1g-dev
+  g++-multilib python-networkx libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev
+  squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven openjdk-8-jdk
+- sudo apt-get install -y ccache &&echo 'export PATH="/usr/lib/ccache:$PATH"' | tee
+  -a ~/.bashrc &&source ~/.bashrc && echo $PATH
+- export USE_CCACHE=1
 before_script:
-# Download the toolchain
-  - git clone "https://bitbucket.org/UBERTC/aarch64-linux-android-4.9" "$HOME/UBERTC"
-
-# Download the Kernel Sources
-  - git clone --depth=50 --branch=Alpha https://github.com/psycho-source/Psycho-Kernel $HOME/kernel
-
+- git clone "https://bitbucket.org/UBERTC/aarch64-linux-android-4.9" "$HOME/UBERTC"
+- git clone --depth=50 --branch=Alpha https://github.com/psycho-source/Psycho-Kernel
+  $HOME/kernel
 script:
-  - export ARCH=arm64
-  - export SUBARCH=arm64
-  - export CROSS_COMPILE="$HOME/UBERTC/bin/aarch64-linux-android-"
-  - cd $HOME/kernel
-  - make clean && make mrproper
-  - make x500_defconfig
-  - make -j8
-
+- export ARCH=arm64
+- export SUBARCH=arm64
+- export CROSS_COMPILE="$HOME/UBERTC/bin/aarch64-linux-android-"
+- cd $HOME/kernel
+- make clean && make mrproper
+- make x500_defconfig
+- make -j8
+after_success:
+- chmod +x update-gh-pages.sh
+- "./update-gh-pages.sh"
+env:
+  global:
+    secure: ZMuY6XCXVwrrslMB++0NEMfh1yACbEUUlV0t4bRKpnXodIaICAS8w0sOE+mfHZ0XROQi+AZSaXVAckY8NGkgLsKU3eKzYb0ehIoX37WQasBcWQGFablN9mozqN4cBV78sx9Vw+/4/8gFMlDwOIJbotg/R/ztsKUs/LU/gSJhO8OYsehdufLp3qqfjKHZ770FXdYV7sh6pMBknWsHoBxrCh1ecZ/KA1UlDyzWmMr7+Gd6GKqQrbp8bP0Y/dufj1hMjKbeAmrXYvcbVvq/v3PqmXkuLt1y/WchnmNqE4hMDaML2cOxibidTm6KBLP0D+YWNYZgh02YIvmsx8jks1b/J++rm/HtE5Yrum3chQwC0vdvFhxDqYRGJoHtkgB3gkjwzs083dOeahTunwlpQkOcPB6hBGX0b8tknHpKySY3QEveZWYnPsDYXThZKh53tFZfF2rqwOTaBu8zfr2OhfYqZBA+2i31LpZv2MT0bLxN0vBH8PaAhhpYvuWMXyzowW9nChKWThHSYoKU1Uc2TcneTp6dN5u9tuhKYn163w0nt3nmtw7UWpjnn+1gsg1A7IAOEtJnCCGKxYS9L+V0VWYCY2POg1+oo+vfDvfqA+zfJP5JmFQJyKaQmr1ZFYIcs32bp1zNBDLuNtVcEUcdOzca3yznmIB8qn+LbyM81qVAnNs=
