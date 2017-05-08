@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+    <meta name="keywords" content="Psycho-Mods, PsychoMods, Psycho-Source, PsychoSource, Psycho-Kernel, PsychoKernel">
+  	<meta name="description" content="Home for all Psycho-Mods">
+  	<meta name="author" content="wItS">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<script src="./Assets/JS/jquery.js"></script>
+	<link rel="stylesheet" href="./Assets/CSS/material.css">
+	<link rel="stylesheet" href="./Assets/CSS/extra.css">
+  	<link rel="stylesheet" href="./Assets/CSS/material-modal.css">
+	<script src="./Assets/JS/extra.js"></script>
+  	<script src="./Assets/JS/material.js"></script>
+  	<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  	<link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Roboto:300,400,500,700" type="text/css">
+	<title>Psycho Mods</title>
+	<link rel="shortcut icon" href="./Assets/Images/favicon.ico">
+	<link rel="icon" sizes="16x16 32x32 64x64" href="./Assets/Images/favicon.ico">
+	<link rel="icon" type="image/png" sizes="196x196" href="./Assets/Images/favicon-192.png">
+	<link rel="icon" type="image/png" sizes="160x160" href="./Assets/Images/favicon-160.png">
+	<link rel="icon" type="image/png" sizes="96x96" href="./Assets/Images/favicon-96.png">
+	<link rel="icon" type="image/png" sizes="64x64" href="./Assets/Images/favicon-64.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="./Assets/Images/favicon-32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="./Assets/Images/favicon-16.png">
+	<link rel="apple-touch-icon" href="./Assets/Images/favicon-57.png">
+	<link rel="apple-touch-icon" sizes="114x114" href="./Assets/Images/favicon-114.png">
+	<link rel="apple-touch-icon" sizes="72x72" href="./Assets/Images/favicon-72.png">
+	<link rel="apple-touch-icon" sizes="144x144" href="./Assets/Images/favicon-144.png">
+	<link rel="apple-touch-icon" sizes="60x60" href="./Assets/Images/favicon-60.png">
+	<link rel="apple-touch-icon" sizes="120x120" href="./Assets/Images/favicon-120.png">
+	<link rel="apple-touch-icon" sizes="76x76" href="./Assets/Images/favicon-76.png">
+	<link rel="apple-touch-icon" sizes="152x152" href="./Assets/Images/favicon-152.png">
+	<link rel="apple-touch-icon" sizes="180x180" href="./Assets/Images/favicon-180.png">
+	<meta name="msapplication-TileColor" content="#FFFFFF">
+	<meta name="msapplication-TileImage" content="./Assets/Images/favicon-144.png">
+	<meta name="msapplication-config" content="./Assets/Images/browserconfig.xml">
+	<meta name="theme-color" content="#2196f3">
+	<meta name="msapplication-navbutton-color" content="#2196f3">
+  	<meta name="apple-mobile-web-app-capable" content="yes">
+  	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body bgcolor="#fafafa">
+	<div id="loader-wrapper">
+      <div id="loader"></div>
+      <div class="loader-section section-left"></div>
+      <div class="loader-section section-right"></div>
+    </div>
+    <div id="content">
+	<div class="mdl-layout mdl-js-layout mdl-layout--fixed-header mdl-layout--fixed-tabs">
+  <header class="mdl-layout__header">
+      <div class="mdl-layout__header-row">
+      <span class="mdl-layout-title">Downloads</span>
+      <div class="mdl-layout-spacer"></div>
+      <button id="menu-lower-right" class="mdl-button mdl-js-button mdl-button--icon">
+       <i class="material-icons">more_vert</i>
+      </button>
+      <ul class="mdl-menu mdl-menu--bottom-right mdl-js-menu mdl-js-ripple-effect" for="menu-lower-right">
+  	   <li id="show-credits" class="mdl-menu__item">Credits</li>
+	  </ul>
+    </div>
+    <div class="mdl-layout__tab-bar mdl-js-ripple-effect">
+      <a href="#stable" class="mdl-layout__tab is-active">Stable</a>
+      <a href="#experimental" class="mdl-layout__tab">Experimental</a>
+    </div>
+  </header>
+  <div class="mdl-layout__drawer">
+    <span class="mdl-layout-title">Go Psycho!</span>
+    <nav class="mdl-navigation">
+      <a class="mdl-navigation__link" href="./Index.html"><i class="material-icons">home</i> Home</a>
+      <a class="mdl-navigation__link" href="./wip.html"><i class="material-icons">build</i> Psycho Kernel</a>
+      <a class="mdl-navigation__link" href="./download.html"><i class="material-icons">system_update</i> Downloads</a>
+      <a class="mdl-navigation__link" href="./wip.html"><i class="material-icons">chat</i> Contact</a>
+      <a class="mdl-navigation__link" href="./wip.html"><i class="material-icons">card_giftcard</i> Support Me</a>
+    </nav>
+  </div>
+  <main class="mdl-layout__content">
+    <section class="mdl-layout__tab-panel is-active" id="stable">
+      <div class="page-content center-block">
+        <table class="mdl-data-table mdl-js-data-table mdl-shadow--16dp">
+  <thead>
+    <tr>
+      <th class="mdl-data-table__cell--non-numeric">Codename</th>
+      <th>Version</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="mdl-data-table__cell--non-numeric">Will be</td>
+      <td>Available Soon</td>
+      <td><a href"" class="mdl-button mdl-js-button mdl-button--accent mdl-js-ripple-effect modal__trigger" data-modal="#stb-warning"><i class="material-icons">get_app</i></a></td>
+    </tr>
+  </tbody>
+</table>
+      </div>
+    </section>
+    <section class="mdl-layout__tab-panel" id="experimental">
+      <div class="page-content center-block">
+        <table class="mdl-data-table mdl-js-data-table mdl-shadow--16dp">
+  <thead>
+    <tr>
+      <th class="mdl-data-table__cell--non-numeric">Codename</th>
+      <th>Version</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="mdl-data-table__cell--non-numeric">Will be</td>
+      <td>Available Soon</td>
+      <td><a href"" class="mdl-button mdl-js-button mdl-button--accent mdl-js-ripple-effect modal__trigger" data-modal="#exp-warning"><i class="material-icons">get_app</i></a></td>
+    </tr>
+  </tbody>
+</table>
+      </div>
+    </section>
+    <div class="page-content">
+<div id="toast-credits" class="mdl-js-snackbar mdl-snackbar">
+  <div class="mdl-snackbar__text"></div>
+  <button class="mdl-snackbar__action" type="button"></button>
+</div>
+<script>
+(function() {
+  'use strict';
+  var snackbarContainer = document.querySelector('#toast-credits');
+  var showToastButton = document.querySelector('#show-credits');
+  showToastButton.addEventListener('click', function() {
+    'use strict';
+    var data = {message: 'Will be added soon. 😋'};
+    snackbarContainer.MaterialSnackbar.showSnackbar(data);
+  });
+}());
+</script>
+    <div id="BL">
+    	<button class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored modal__trigger" data-modal="#contact">
+  			<i class="material-icons">mail</i>
+		</button>
+	</div>
+  </main>
+  <footer class="mdl-mini-footer">
+  <div class="mdl-mini-footer__left-section">
+    <div class="mdl-logo">Psycho Mods</div>
+    <ul class="mdl-mini-footer__link-list">
+      <li>Website Designed by <a href="https://www.facebook.com/profile.php?id=100004892355360" target="blank"><u>wItS</u></a></li>
+    </ul>
+  </div>
+</footer>
+ <div id="exp-warning" class="modal modal__bg">
+        <div class="modal__dialog">
+          <div class="modal__content">
+            <div class="modal__header">
+              <div class="modal__title">
+                <h2 class="modal__title-text" style="color: #f44336;">Experimental Builds!</h2>
+              </div>
+              <span class="mdl-button mdl-button--icon mdl-js-button material-icons modal__close"></span>
+            </div>
+            <div class="modal__text">
+              <p>
+                You are about to Download an Experimental Build! These Builds contains all the pre-released and new features but may also have some bugs. These builds may or may not boot up on devices as they are not individually tested by me or any one else! You are advised to keep a <strong>backup of your boot.img</strong> just in case something goes wrong, and do report any bugs you face!
+                <br>Happy Testing 😎
+              </p>
+            </div>
+            <div class="modal__footer">
+              <button class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--primary">
+                <i class="material-icons">get_app</i>
+                Download
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+  <div id="stb-warning" class="modal modal__bg">
+        <div class="modal__dialog">
+          <div class="modal__content">
+            <div class="modal__header">
+              <div class="modal__title">
+                <h2 class="modal__title-text" style="color: #f44336;">Stable Builds!</h2>
+              </div>
+              <span class="mdl-button mdl-button--icon mdl-js-button material-icons modal__close"></span>
+            </div>
+            <div class="modal__text">
+              <p>
+                Though Tested These builds might have some Bugs which went unnoticed. If you face any such bugs then kindly report them.<br>You are advised to keep a <strong>backup of your boot.img</strong> just in case something goes wrong!<br>Feel Psycho 😎
+              </p>
+            </div>
+            <div class="modal__footer">
+              <button class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-button--primary">
+                <i class="material-icons">get_app</i>
+                Download
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="contact" class="modal modal__bg">
+        <div class="modal__dialog">
+          <div class="modal__content">
+            <div class="modal__header" style="background:#2196f3; color:#ffffff;">
+              <div class="modal__title">
+                <h2 class="modal__title-text" style="color: #ffffff;">Get In Touch</h2>
+              </div>
+              <span class="mdl-button mdl-button--icon mdl-js-button material-icons modal__close"></span>
+            </div>
+            <div class="modal__text">
+				<form method="POST" action="https://formspree.io/nishsin26@gmail.com">
+  					<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+    					<input id="email" class="mdl-textfield__input" name="email" type="email">
+    					<label class="mdl-textfield__label" for="email">Your email</label>
+    				</div>
+    				<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+    					<textarea id="message" class="mdl-textfield__input" name="message" type="text" rows= ""></textarea>
+    					<label class="mdl-textfield__label" for="message">Your message</label>
+  					</div>
+  					<div>
+  						<button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" type="submit">
+  							Submit
+						</button>
+					</div>
+					<input type="hidden" name="_next" value="./Index.html" />
+				</form>
+            </div>
+          </div>
+        </div>
+      </div>
+</div>
+</div>
+<script src="./Assets/JS/material-modal.min.js"></script>
+</body>
+</html>
