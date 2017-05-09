@@ -1,0 +1,7 @@
+I am not responsible for bricked devices, dead SD cards, Parents Scolding, thermonuclear war, 
+A Zombie Apocalypse or you getting fired because the alarm app failed. Please do some research 
+if you have any concerns about features included in this KERNEL
+before flashing it! YOU are choosing to make these modifications, and if
+you point your finger at me for messing up your device, I will laugh at you.
+If you need help then simply report the problem you facing on my thread "with logs"
+and wait for me to fix it!

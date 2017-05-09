@@ -1,0 +1,2 @@
+# USB storage device
+/devices/bus.2/11270000.USB3_XHCI* auto vfat defaults voldmanaged=usbotg:auto

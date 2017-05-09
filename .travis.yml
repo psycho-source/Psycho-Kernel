@@ -26,6 +26,7 @@ script:
 - make x500_defconfig
 - make -j8
 after_success:
+- cp -R $HOME/kernel/arch/arm64/boot/Image.gz-dtb $HOME/kernel/flashable/zImage
 - chmod +x update-gh-pages.sh
 - "./update-gh-pages.sh"
 env:
