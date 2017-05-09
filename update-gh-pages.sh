@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 VER="-$(date +"%Y-%m-%d"-%H%M)-"
 CODE="Experi"
