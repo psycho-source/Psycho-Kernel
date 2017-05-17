@@ -15,6 +15,7 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/hrtimer.h>
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/input.h>
@@ -28,7 +29,7 @@
 
 #define THUNDERPLUG                  "thunderplug"
 
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+#ifdef CONFIG_SCHED_HMP
 #define DRIVER_VERSION                5
 #else
 #define DRIVER_VERSION                3
@@ -61,7 +62,7 @@ static int stop_boost = 0;
 
 struct cpufreq_policy old_policy[NR_CPUS];
 
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+#ifdef CONFIG_SCHED_HMP
 static int tplug_hp_style = DEFAULT_HOTPLUG_STYLE;
 #else
 static int tplug_hp_enabled = HOTPLUG_ENABLED;
@@ -154,7 +155,7 @@ static void __ref tplug_boost_work_fn(struct work_struct *work)
 	struct cpufreq_policy policy;
 	int cpu, ret;
 	for(cpu = 1; cpu < NR_CPUS; cpu++) {
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+#ifdef CONFIG_SCHED_HMP
     if(tplug_hp_style == 1)
 #else
 	if(tplug_hp_enabled == 1)
@@ -190,7 +191,7 @@ static void tplug_input_event(struct input_handle *handle, unsigned int type,
 				pr_info("%s: starting boost\n", THUNDERPLUG);
 		}
 	}
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+#ifdef CONFIG_SCHED_HMP
     if ((type == EV_KEY) && (code == BTN_TOUCH) && (value == 1)
 		&& touch_boost_enabled == 1)
 #else
@@ -281,7 +282,11 @@ static ssize_t __ref thunderplug_endurance_store(struct kobject *kobj, struct ko
 {
 	int val;
 	sscanf(buf, "%d", &val);
-	if(tplug_hp_style == 1) {
+#ifdef CONFIG_SCHED_HMP
+	if(tplug_hp_style==1) {
+#else
+	if(tplug_hp_enabled) {
+#endif
 	switch(val) {
 	case 0:
 	case 1:
@@ -459,7 +464,7 @@ static void __cpuinit tplug_work_fn(struct work_struct *work)
 		}
 	}
 
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+#ifdef CONFIG_SCHED_HMP
     if(tplug_hp_style == 1 && !isSuspended)
 #else
 	if(tplug_hp_enabled != 0 && !isSuspended)
@@ -475,14 +480,14 @@ static void __cpuinit tplug_work_fn(struct work_struct *work)
 
 }
 
-static void tplug_suspend_work(void) {
+static void tplug_es_suspend_work(struct early_suspend *p) {
 	isSuspended = true;
 	pr_info("thunderplug : suspend called\n");
 }
 
-static void tplug_resume_work(void) {
+static void tplug_es_resume_work(struct early_suspend *p) {
 	isSuspended = false;
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+#ifdef CONFIG_SCHED_HMP
 	if(tplug_hp_style==1)
 #else
 	if(tplug_hp_enabled)
@@ -497,12 +502,12 @@ static void tplug_resume_work(void) {
 
 static struct early_suspend tplug_early_suspend_handler = 
 	{
-		.suspend = tplug_suspend_work,
-		.resume = tplug_resume_work,
+		.suspend = tplug_es_suspend_work,
+		.resume = tplug_es_resume_work,
 	};
 
 /* Thunderplug load balancer */
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+#ifdef CONFIG_SCHED_HMP
 
 static void set_sched_profile(int mode) {
     switch(mode) {
@@ -657,7 +662,7 @@ static struct attribute *thunderplug_attrs[] =
         &thunderplug_endurance_attribute.attr,
         &thunderplug_sampling_attribute.attr,
         &thunderplug_load_attribute.attr,
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+#ifdef CONFIG_SCHED_HMP
         &thunderplug_mode_attribute.attr,
         &thunderplug_hp_style_attribute.attr,
 #else
