@@ -15,26 +15,21 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/input.h>
 #include <linux/slab.h>
 #include <linux/cpu.h>
+#include <linux/lcd_notify.h>
 #include <linux/cpufreq.h>
-#include <linux/earlysuspend.h>
 #include "thunderplug.h"
 
 #define DEBUG                        0
 
 #define THUNDERPLUG                  "thunderplug"
 
-#ifdef CONFIG_SCHED_HMP
 #define DRIVER_VERSION                5
-#else
-#define DRIVER_VERSION                3
 #define DRIVER_SUBVER                 0
-#endif
 
 #define DEFAULT_CPU_LOAD_THRESHOLD   (65)
 #define MIN_CPU_LOAD_THRESHOLD       (10)
@@ -50,6 +45,8 @@
 
 static bool isSuspended = false;
 
+struct notifier_block lcd_worker;
+
 static int suspend_cpu_num = 2, resume_cpu_num = (NR_CPUS -1);
 static int endurance_level = 0;
 static int core_limit = NR_CPUS;
@@ -62,7 +59,7 @@ static int stop_boost = 0;
 
 struct cpufreq_policy old_policy[NR_CPUS];
 
-#ifdef CONFIG_SCHED_HMP
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
 static int tplug_hp_style = DEFAULT_HOTPLUG_STYLE;
 #else
 static int tplug_hp_enabled = HOTPLUG_ENABLED;
@@ -155,7 +152,7 @@ static void __ref tplug_boost_work_fn(struct work_struct *work)
 	struct cpufreq_policy policy;
 	int cpu, ret;
 	for(cpu = 1; cpu < NR_CPUS; cpu++) {
-#ifdef CONFIG_SCHED_HMP
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
     if(tplug_hp_style == 1)
 #else
 	if(tplug_hp_enabled == 1)
@@ -191,7 +188,7 @@ static void tplug_input_event(struct input_handle *handle, unsigned int type,
 				pr_info("%s: starting boost\n", THUNDERPLUG);
 		}
 	}
-#ifdef CONFIG_SCHED_HMP
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
     if ((type == EV_KEY) && (code == BTN_TOUCH) && (value == 1)
 		&& touch_boost_enabled == 1)
 #else
@@ -460,7 +457,7 @@ static void __cpuinit tplug_work_fn(struct work_struct *work)
 		}
 	}
 
-#ifdef CONFIG_SCHED_HMP
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
     if(tplug_hp_style == 1 && !isSuspended)
 #else
 	if(tplug_hp_enabled != 0 && !isSuspended)
@@ -476,34 +473,41 @@ static void __cpuinit tplug_work_fn(struct work_struct *work)
 
 }
 
-static void tplug_suspend_work(void) {
-	isSuspended = true;
-	pr_info("thunderplug : suspend called\n");
-}
-
-static void tplug_resume_work(void) {
-	isSuspended = false;
-#ifdef CONFIG_SCHED_HMP
-	if(tplug_hp_style==1)
+static int lcd_notifier_callback(struct notifier_block *nb,
+                                 unsigned long event, void *data)
+{
+       switch (event) {
+       case LCD_EVENT_ON_START:
+			isSuspended = false;
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+			if(tplug_hp_style==1)
 #else
-	if(tplug_hp_enabled)
+			if(tplug_hp_enabled)
 #endif
-	queue_delayed_work_on(0, tplug_wq, &tplug_work,
-					msecs_to_jiffies(sampling_time));
-	else
-		queue_delayed_work_on(0, tplug_resume_wq, &tplug_resume_work,
-		            msecs_to_jiffies(10));
-	pr_info("thunderplug : resume called\n");
-}
+				queue_delayed_work_on(0, tplug_wq, &tplug_work,
+								msecs_to_jiffies(sampling_time));
+			else
+				queue_delayed_work_on(0, tplug_resume_wq, &tplug_resume_work,
+		                      msecs_to_jiffies(10));
+			pr_info("thunderplug : resume called\n");
+               break;
+       case LCD_EVENT_ON_END:
+               break;
+       case LCD_EVENT_OFF_START:
+               break;
+       case LCD_EVENT_OFF_END:
+			isSuspended = true;
+			pr_info("thunderplug : suspend called\n");
+               break;
+       default:
+               break;
+       }
 
-static struct early_suspend tplug_early_suspend_handler = 
-	{
-		.suspend = tplug_suspend_work,
-		.resume = tplug_resume_work,
-	};
+       return 0;
+}
 
 /* Thunderplug load balancer */
-#ifdef CONFIG_SCHED_HMP
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
 
 static void set_sched_profile(int mode) {
     switch(mode) {
@@ -658,7 +662,7 @@ static struct attribute *thunderplug_attrs[] =
         &thunderplug_endurance_attribute.attr,
         &thunderplug_sampling_attribute.attr,
         &thunderplug_load_attribute.attr,
-#ifdef CONFIG_SCHED_HMP
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
         &thunderplug_mode_attribute.attr,
         &thunderplug_hp_style_attribute.attr,
 #else
@@ -680,7 +684,6 @@ static int __init thunderplug_init(void)
         int ret = 0;
         int sysfs_result;
         printk(KERN_DEBUG "[%s]\n",__func__);
-		register_early_suspend(&tplug_early_suspend_handler);
 
         thunderplug_kobj = kobject_create_and_add("thunderplug", kernel_kobj);
 
@@ -696,6 +699,10 @@ static int __init thunderplug_init(void)
                 pr_info("%s sysfs create failed!\n", __FUNCTION__);
                 kobject_put(thunderplug_kobj);
         }
+
+		lcd_worker.notifier_call = lcd_notifier_callback;
+
+        lcd_register_client(&lcd_worker);
 
 		pr_info("%s : registering input boost", THUNDERPLUG);
 		ret = input_register_handler(&tplug_input_handler);
