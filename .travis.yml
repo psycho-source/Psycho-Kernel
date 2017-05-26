@@ -22,8 +22,6 @@ script:
 - export SUBARCH=arm64
 - export CROSS_COMPILE="$HOME/UBERTC/bin/aarch64-linux-android-"
 - cd $HOME/kernel
-- cp drivers/gpu/drm/nouveau/core/subdev/i2c/aux-1.c drivers/gpu/drm/nouveau/core/subdev/i2c/aux.c
-- rm drivers/gpu/drm/nouveau/core/subdev/i2c/aux-1.c
 - make clean && make mrproper
 - make x500_defconfig
 - make -j8
