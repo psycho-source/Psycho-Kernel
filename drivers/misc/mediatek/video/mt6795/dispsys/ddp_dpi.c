@@ -578,8 +578,7 @@ static irqreturn_t _DPI_InterruptHandler(int irq, void *dev_id)
 		}
 
 		if (counter) {
-			DISP_LOG_PRINT(ANDROID_LOG_ERROR, "DPI", "[Error] DPI FIFO is empty,
-				       received % d times interrupt !!!\n", counter);
+			DISP_LOG_PRINT(ANDROID_LOG_ERROR, "DPI", "[Error] DPI FIFO is empty, received % d times interrupt !!!\n", counter);
 			counter = 0;
 		}
 	}
