@@ -30,7 +30,7 @@ ini_set("rom_name", "Psycho Kernel");
 ini_set("rom_version", "Experimental");
 ini_set("rom_author", "Psycho-Mods");
 ini_set("rom_device", "LeEco Le 1s");
-ini_set("rom_date", "Apr, 15 2017");
+ini_set("rom_date", "Jun, 18 2017");
 
 ini_set("force_colorspace", "rgba");
 splash(
@@ -47,60 +47,21 @@ selectbox(
     "@personalize",
     "theme.prop",
     "Generic",            "Default Unthemed AROMA Installer",             0,
-    "Material Blue",      "Blue Material Designed Theme",                 1,
-    "Material Blue-Grey", "Blue-grey Material Designed Theme",    0,
-    "Material Green",     "Green Material Designed Theme",                0,
-    "Material Grey",      "Grey Material Designed Theme",                 0,
+    "Material Blue-Grey", "Blue-grey Material Designed Theme",    1,
     "Material Indigo",   "Indigo Material Designed Theme",              0,
-    "Material Pink",      "Pink Material Designed Theme",                 0,
-    "Material Purple",    "Purple Material Designed Theme",               0,
-    "Material Red",       "Red Material Designed Theme",                  0,
-    "Material Teal",       "Teal Material Designed Theme",                 0,
-    "Material Yellow",    "Yellow Material Designed Theme",               0
+    "Material Teal",       "Teal Material Designed Theme",                 0
 );
 
 if file_getprop("/tmp/aroma/theme.prop","selected.0")=="2" then
-  theme("blue");
-endif;
-
-if file_getprop("/tmp/aroma/theme.prop","selected.0")=="3" then
   theme("blue-grey");
 endif;
 
-if file_getprop("/tmp/aroma/theme.prop","selected.0")=="4" then
-  theme("green");
-endif;
-
-
-if file_getprop("/tmp/aroma/theme.prop","selected.0")=="5" then
-  theme("grey");
-endif;
-
-
-if file_getprop("/tmp/aroma/theme.prop","selected.0")=="6" then
+if file_getprop("/tmp/aroma/theme.prop","selected.0")=="3" then
   theme("indigo");
 endif;
 
-
-if file_getprop("/tmp/aroma/theme.prop","selected.0")=="7" then
-  theme("pink");
-endif;
-
-if file_getprop("/tmp/aroma/theme.prop","selected.0")=="8" then
-  theme("purple");
-endif;
-
-
-if file_getprop("/tmp/aroma/theme.prop","selected.0")=="9" then
-  theme("red");
-endif;
-
-if file_getprop("/tmp/aroma/theme.prop","selected.0")=="10" then
+if file_getprop("/tmp/aroma/theme.prop","selected.0")=="4" then
   theme("teal");
-endif;
-
-if file_getprop("/tmp/aroma/theme.prop","selected.0")=="11" then
-  theme("yellow");
 endif;
 
 viewbox(
