@@ -3,7 +3,7 @@
 #
 include $(srctree)/drivers/misc/mediatek/Makefile.custom
 
-obj-y += h070d_18dm.o
+obj-y += H070D_18DM.o
 
 
 

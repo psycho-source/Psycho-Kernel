@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASEVER="Psycho-Kernel"
-VER="-v3"
+VER="-v4"
 #Update VER Variable after every update
 if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
   echo -e "Starting to update gh-pages\n"

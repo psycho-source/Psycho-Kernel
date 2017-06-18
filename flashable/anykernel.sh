@@ -45,6 +45,9 @@ backup_file init.mt6795.rc;
 insert_line init.mt6795.rc "nodiratime barrier=0" after "mount_all /fstab.tuna" "\tmount ext4 /dev/block/platform/omap/omap_hsmmc.0/by-name/userdata /data remount nosuid nodev noatime nodiratime barrier=0";
 append_file init.mt6795.rc "dvbootscript" init.mt6795;
 
+#CPU Profiles SPecific Stuff
+  insert_line init.rc "import /init.spectrum.rc" after "import /init.magisk.rc" "import /init.spectrum.rc";
+
 # fstab.mt6795
 backup_file fstab.mt6795;
 patch_fstab fstab.mt6795 /system ext4 options "nodiratime,barrier=0" "nodev,noatime,nodiratime,barrier=0,data=writeback,noauto_da_alloc,discard";
