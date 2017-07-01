@@ -245,6 +245,7 @@ static int blkcipher_walk_next(struct blkcipher_desc *desc,
 		}
 	}
 
+	bsize = min(walk->walk_blocksize, n);
 	n = scatterwalk_clamp(&walk->in, n);
 	n = scatterwalk_clamp(&walk->out, n);
 
@@ -470,7 +471,6 @@ static int crypto_init_blkcipher_ops_async(struct crypto_tfm *tfm)
 	}
 	crt->base = __crypto_ablkcipher_cast(tfm);
 	crt->ivsize = alg->ivsize;
-	crt->has_setkey = alg->max_keysize;
 
 	return 0;
 }

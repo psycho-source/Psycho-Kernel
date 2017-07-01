@@ -71,8 +71,7 @@ enum {
 	/* data contains off-queue information when !WORK_STRUCT_PWQ */
 	WORK_OFFQ_FLAG_BASE	= WORK_STRUCT_COLOR_SHIFT,
 
-	__WORK_OFFQ_CANCELING	= WORK_OFFQ_FLAG_BASE,
-	WORK_OFFQ_CANCELING	= (1 << __WORK_OFFQ_CANCELING),
+	WORK_OFFQ_CANCELING	= (1 << WORK_OFFQ_FLAG_BASE),
 
 	/*
 	 * When a work item is off queue, its high bits point to the last
@@ -303,33 +302,6 @@ enum {
 	WQ_HIGHPRI		= 1 << 4, /* high priority */
 	WQ_CPU_INTENSIVE	= 1 << 5, /* cpu instensive workqueue */
 	WQ_SYSFS		= 1 << 6, /* visible in sysfs, see wq_sysfs_register() */
-
-	/*
-	 * Per-cpu workqueues are generally preferred because they tend to
-	 * show better performance thanks to cache locality.  Per-cpu
-	 * workqueues exclude the scheduler from choosing the CPU to
-	 * execute the worker threads, which has an unfortunate side effect
-	 * of increasing power consumption.
-	 *
-	 * The scheduler considers a CPU idle if it doesn't have any task
-	 * to execute and tries to keep idle cores idle to conserve power;
-	 * however, for example, a per-cpu work item scheduled from an
-	 * interrupt handler on an idle CPU will force the scheduler to
-	 * excute the work item on that CPU breaking the idleness, which in
-	 * turn may lead to more scheduling choices which are sub-optimal
-	 * in terms of power consumption.
-	 *
-	 * Workqueues marked with WQ_POWER_EFFICIENT are per-cpu by default
-	 * but become unbound if workqueue.power_efficient kernel param is
-	 * specified.  Per-cpu workqueues which are identified to
-	 * contribute significantly to power-consumption are identified and
-	 * marked with this flag and enabling the power_efficient mode
-	 * leads to noticeable power saving at the cost of small
-	 * performance disadvantage.
-	 *
-	 * http://thread.gmane.org/gmane.linux.kernel/1480396
-	 */
-	WQ_POWER_EFFICIENT	= 1 << 7,
 
 	__WQ_DRAINING		= 1 << 16, /* internal: workqueue is draining */
 	__WQ_ORDERED		= 1 << 17, /* internal: workqueue is ordered */

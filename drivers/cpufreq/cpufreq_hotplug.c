@@ -30,7 +30,7 @@
 #include <linux/kthread.h>
 #include <linux/input.h>	/* <-XXX */
 #include <linux/slab.h>		/* <-XXX */
-#include <mach/mt_cpufreq.h>	/* <-XXX */
+#include "mach/mt_cpufreq.h"	/* <-XXX */
 
 #include "cpufreq_governor.h"
 
