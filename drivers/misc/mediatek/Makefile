@@ -62,6 +62,7 @@ obj-$(CONFIG_MTK_EMI_BWL)	+= emi_bwl/
 obj-$(CONFIG_MTK_FMRADIO)	+= fmradio/
 obj-$(CONFIG_MTK_GPS)	    += gps/
 
+
 obj-y	+= m4u/
 #obj-y	+= mhl/
 obj-$(CONFIG_MTPROF)	+= mtprof/

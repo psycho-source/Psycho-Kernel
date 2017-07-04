@@ -47,6 +47,9 @@
 #include <mach/battery_common.h>
 #include <mach/charging.h>
 #include "cust_charging.h"
+#ifdef CONFIG_THUNDERCHARGE_CONTROL
+#include "thundercharge_control.h"
+#endif
 #include <mach/mt_boot.h>
 #include <linux/delay.h>
 #include <mach/battery_meter.h>
@@ -63,7 +66,7 @@
 #define BJT_LIMIT			1200000		/* 1.2W */
 #ifndef TA_START_VCHR_TUNUNG_VOLTAG
 #define TA_START_VCHR_TUNUNG_VOLTAGE	3700		/* for isink blink issue */
-#define TA_CHARGING_CURRENT		CHARGE_CURRENT_1500_00_MA
+#define TA_CHARGING_CURRENT		CHARGE_CURRENT_2000_00_MA
 #endif	/* TA_START_VCHR_TUNUNG_VOLTAG */
 #endif	/* MTK_PUMP_EXPRESS_SUPPORT */
 
@@ -832,6 +835,36 @@ void select_charging_curret(void)
 #else
 			g_temp_CC_value = CHARGING_HOST_CHARGER_CURRENT;
 #endif
+#ifdef CONFIG_THUNDERCHARGE_CONTROL
+				if(mswitch)
+					g_temp_CC_value_linear = custom_usb_current;
+				else
+					g_temp_CC_value_linear = cur_usb_charger;
+#else
+				g_temp_CC_value_linear = cur_usb_charger;
+#endif
+			}
+#endif
+		} else if (BMT_status.charger_type == NONSTANDARD_CHARGER) {
+#ifdef CONFIG_THUNDERCHARGE_CONTROL
+if(mswitch)
+				g_temp_CC_value_linear = custom_ac_current;
+			else
+				g_temp_CC_value_linear = cur_no_std_charger;
+#else
+			g_temp_CC_value_linear = cur_no_std_charger;
+#endif
+		} else if (BMT_status.charger_type == STANDARD_CHARGER) {
+#ifdef CONFIG_THUNDERCHARGE_CONTROL
+			if(mswitch)
+				g_temp_CC_value_linear = custom_ac_current;
+			else
+				g_temp_CC_value_linear = cur_ac_charger;
+#else
+			g_temp_CC_value_linear = cur_ac_charger;
+#endif
+		} else if (BMT_status.charger_type == CHARGING_HOST) {
+			g_temp_CC_value_linear = cur_charging_host;
 		} else if (BMT_status.charger_type == APPLE_2_1A_CHARGER) {
 			g_temp_CC_value = APPLE_2_1A_CHARGER_CURRENT;
 		} else if (BMT_status.charger_type == APPLE_1_0A_CHARGER) {

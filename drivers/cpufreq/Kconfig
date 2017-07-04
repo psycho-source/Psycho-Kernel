@@ -115,6 +115,12 @@ config CPU_FREQ_DEFAULT_GOV_CONSERVATIVE
 	  governor. If unsure have a look at the help section of the
 	  driver. Fallback governor will be the performance governor.
 
+config CPU_FREQ_DEFAULT_GOV_THUNDERX
+  bool "thunderx"
+  select CPU_FREQ_GOV_THUNDERX
+  help
+	Uses ThunderX as Yuor Default Governer
+
 config CPU_FREQ_DEFAULT_GOV_INTERACTIVE
 	bool "interactive"
 	select CPU_FREQ_GOV_INTERACTIVE
@@ -146,7 +152,8 @@ config CPU_FREQ_DEFAULT_GOV_HOTPLUG
 	  loading your cpufreq low-level hardware driver.
 	  Be aware that not all cpufreq drivers support the hotplug
 	  governor. If unsure have a look at the help section of the
-	  driver. Fallback governor will be the performance governor.
+	  driver. Fallback governor will be the performance governor
+
 
 endchoice
 
@@ -284,6 +291,12 @@ config CPU_FREQ_GOV_CONSERVATIVE
 
 	  If in doubt, say N.
 
+config CPU_FREQ_GOV_THUNDERX
+  tristate "'thunderx' cpufreq governor"
+  depends on CPU_FREQ
+  help
+    'thunderx' - a "power optimized" governor for Mediatek SoCs
+
 config CPU_FREQ_GOV_HOTPLUG
 	tristate "'hotplug' cpufreq policy governor"
 	select CPU_FREQ_TABLE
@@ -302,6 +315,7 @@ config CPU_FREQ_GOV_HOTPLUG
 	  For details, take a look at linux/Documentation/cpu-freq.
 
 	  If in doubt, say N.
+
 
 config GENERIC_CPUFREQ_CPU0
 	tristate "Generic CPU0 cpufreq driver"
