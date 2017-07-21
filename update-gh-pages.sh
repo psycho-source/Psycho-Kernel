@@ -1,7 +1,7 @@
 #!/bin/bash
 
-VER="-v5.0"
-CODE="Kernel"
+VER="-$(date +"%Y-%m-%d"-%H%M)"
+CODE="Alpha"
 BASEVER="Psycho-"
 if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
   echo -e "Starting to update gh-pages\n"
