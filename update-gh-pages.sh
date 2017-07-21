@@ -24,7 +24,7 @@ if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
   git clone --quiet --branch=gh-pages https://${GH_TOKEN}@github.com/psycho-source/Psycho-Kernel.git  gh-pages > /dev/null
 
   #go into diractory and copy data we're interested in to that directory
-  cp -Rf $HOME/Builds/* $HOME/gh-pages/Stable/
+  cp -Rf $HOME/Builds/* $HOME/gh-pages/Experimental/
 
   #add, commit and push files
   cd gh-pages
