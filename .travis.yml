@@ -13,7 +13,7 @@ before_install:
 - export USE_CCACHE=1
 before_script:
 - git clone "https://bitbucket.org/UBERTC/aarch64-linux-android-4.9" "$HOME/UBERTC"
-- git clone --depth=50 --branch=Alpha https://github.com/psycho-source/Psycho-Kernel
+- git clone --depth=50 --branch=master https://github.com/psycho-source/Psycho-Kernel
   $HOME/kernel
 script:
 - export KBUILD_BUILD_USER="wItS"
