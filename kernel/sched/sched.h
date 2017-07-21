@@ -1420,12 +1420,6 @@ static inline u64 irq_time_read(int cpu)
 #endif /* CONFIG_64BIT */
 #endif /* CONFIG_IRQ_TIME_ACCOUNTING */
 
-#ifdef CONFIG_SMP
-static inline int rq_cpu(const struct rq *rq) { return rq->cpu; }
-#else
-static inline int rq_cpu(const struct rq *rq) { return 0; }
-#endif
-
 static inline void account_reset_rq(struct rq *rq)
 {
 #ifdef CONFIG_IRQ_TIME_ACCOUNTING
@@ -1438,4 +1432,10 @@ static inline void account_reset_rq(struct rq *rq)
 	rq->prev_steal_time_rq = 0;
 #endif
 }
+
+#ifdef CONFIG_SMP
+static inline int rq_cpu(const struct rq *rq) { return rq->cpu; }
+#else
+static inline int rq_cpu(const struct rq *rq) { return 0; }
+#endif
 

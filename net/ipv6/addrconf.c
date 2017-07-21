@@ -1938,7 +1938,7 @@ static int ipv6_inherit_eui64(u8 *eui, struct inet6_dev *idev)
 static void __ipv6_regen_rndid(struct inet6_dev *idev)
 {
 regen:
-	get_random_bytes(idev->rndid, sizeof(idev->rndid));
+	prandom_bytes(idev->rndid, sizeof(idev->rndid));
 	idev->rndid[0] &= ~0x02;
 
 	/*
@@ -3275,11 +3275,10 @@ static void addrconf_rs_timer(unsigned long data)
 
 		/* The wait after the last probe can be shorter */
 		addrconf_mod_rs_timer(idev, (idev->rs_probes ==
- 				     idev->cnf.rtr_solicits) ?
+					     idev->cnf.rtr_solicits) ?
 				      idev->cnf.rtr_solicit_delay :
 				      idev->cnf.rtr_solicit_interval);
 	} else {
-		inet6_no_ra_notify(RTM_NORA,idev);
 		/*
 		 * Note: we do not support deprecated "all on-link"
 		 * assumption any longer.
@@ -4911,8 +4910,7 @@ static void addrconf_disable_change(struct net *net, __s32 newf)
 	struct net_device *dev;
 	struct inet6_dev *idev;
 
-	rcu_read_lock();
-	for_each_netdev_rcu(net, dev) {
+	for_each_netdev(net, dev) {
 		idev = __in6_dev_get(dev);
 		if (idev) {
 			int changed = (!idev->cnf.disable_ipv6) ^ (!newf);
@@ -4921,7 +4919,6 @@ static void addrconf_disable_change(struct net *net, __s32 newf)
 				dev_disable_change(idev);
 		}
 	}
-	rcu_read_unlock();
 }
 
 static int addrconf_disable_ipv6(struct ctl_table *table, int *p, int newf)

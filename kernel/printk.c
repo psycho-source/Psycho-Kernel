@@ -152,7 +152,8 @@ static struct console *exclusive_console;
 /*
  *	Array of consoles built from command line options (console=)
  */
-struct console_cmdline {
+struct console_cmdline
+{
 	char	name[16];			/* Name of the driver	    */
 	int	index;				/* Minor dev. to use	    */
 	char	*options;			/* Options for the driver   */
@@ -1368,7 +1369,7 @@ static void call_console_drivers(int level, const char *text, size_t len)
 {
 	struct console *con;
 
-	trace_console(text, len);
+	trace_console_rcuidle(text, len);
 
 	if (level >= console_loglevel && !ignore_loglevel)
 		return;
@@ -2259,7 +2260,18 @@ void console_unlock(void)
 		return;
 	}
 
-    do_cond_resched = console_may_schedule;
+	/*
+	 * Console drivers are called under logbuf_lock, so
+	 * @console_may_schedule should be cleared before; however, we may
+	 * end up dumping a lot of lines, for example, if called from
+	 * console registration path, and should invoke cond_resched()
+	 * between lines if allowable.  Not doing so can cause a very long
+	 * scheduling stall on a slow console leading to RCU stall and
+	 * softlockup warnings which exacerbate the issue with more
+	 * messages practically incapacitating the system.
+	 */
+	do_cond_resched = console_may_schedule;
+
 	console_may_schedule = 0;
 
 	/* flush buffered message fragment immediately to console */
@@ -2364,7 +2376,6 @@ skip:
 		call_console_drivers(level, text, len);
 #endif
 		local_irq_restore(flags);
-
 		if (do_cond_resched)
 			cond_resched();
 	}

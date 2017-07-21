@@ -1218,7 +1218,9 @@ static void binder_check_buf(struct binder_proc *target_proc,
 	struct timespec exp_timestamp;
 	struct timeval tv;
 	struct rtc_time tm;
+#if defined(CONFIG_MTK_AEE_FEATURE)
 	int db_flag = DB_OPT_BINDER_INFO;
+#endif
 	int len_s, len_r;
 
 	pr_debug("buffer allocation failed on %d:0 "
@@ -3594,9 +3596,9 @@ retry:
 			pr_err("read put err2 %u to user %p, thread error %u:%u\n",
 					thread->return_error2, ptr, thread->return_error, thread->return_error2);
 			binder_stat_br(proc, thread, thread->return_error2);
+			thread->return_error2 = BR_OK;
 			if (ptr == end)
 				goto done;
-			thread->return_error2 = BR_OK;
 		}
 		if (put_user(thread->return_error, (uint32_t __user *)ptr))
 			return -EFAULT;

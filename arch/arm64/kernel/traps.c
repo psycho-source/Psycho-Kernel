@@ -373,7 +373,8 @@ int register_async_abort_handler(void (*fn)(struct pt_regs *regs, void *), void 
 #endif
 
 /*
- * bad_mode handles the impossible case in the exception vector.
+ * bad_mode handles the impossible case in the exception vector. This is always
+ * fatal.
  */
 asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 {
@@ -390,8 +391,8 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 #endif
 	pr_crit("Bad mode in %s handler detected, code 0x%08x\n",
 		handler[reason], esr);
-		
-			die("Oops - bad mode", regs, 0);
+
+	die("Oops - bad mode", regs, 0);
 	local_irq_disable();
 	panic("bad mode");
 }

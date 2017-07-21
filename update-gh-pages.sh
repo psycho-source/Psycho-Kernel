@@ -1,16 +1,19 @@
 #!/bin/bash
 
-BASEVER="Psycho-Kernel"
-VER="-v4"
-#Update VER Variable after every update
+VER="-v5.0"
+CODE="Kernel"
+BASEVER="Psycho-"
 if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
   echo -e "Starting to update gh-pages\n"
 
   #copy data we're interested in to other place
   mkdir $HOME/Builds
   cd $HOME/kernel/flashable
-  zip -r `echo $BASEVER$VER`.zip *
-  mv `echo $BASEVER$VER`.zip $HOME/Builds
+  zip -r `echo $BASEVER$CODE$VER`.zip *
+  mv `echo $BASEVER$CODE$VER`.zip $HOME/Builds
+  cd $HOME/Builds
+  md5sum `echo $BASEVER$CODE$VER`.zip > md5.txt
+  sha256sum `echo $BASEVER$CODE$VER`.zip > sha256.txt
 
   #go to home and setup git
   cd $HOME
@@ -26,7 +29,7 @@ if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
   #add, commit and push files
   cd gh-pages
   git add -f .
-  git commit -m "New Stable Build $BASEVER$VER pushed to gh-pages/Stable"
+  git commit -m "Travis build $TRAVIS_BUILD_NUMBER pushed to gh-pages"
   git push -fq origin gh-pages > /dev/null
 
   echo -e "Done\n"

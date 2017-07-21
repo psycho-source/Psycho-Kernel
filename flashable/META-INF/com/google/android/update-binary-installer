@@ -61,11 +61,15 @@ fi;
 if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.initd)" == 1 ]; then
   ui_print "Pushing Some Important Stuff...";
   mount -o rw,remount -t auto /system;
-  mkdir $root/system/etc/init.d;
-  mkdir $root/system/priv-app/Spectrum;
-  cp /tmp/anykernel/spec/Spectrum.apk $root/system/priv-app/Spectrum/Spectrum.apk;
-  set_perm_recursive 0 0 0755 0644 $root/system/priv-app/Spectrum;
-  set_perm_recursive 0 0 0755 0755 $root/system/etc/init.d;
+  mkdir $root/data/app/org.frap129.spectrum-1;
+  mkdir $root/data/app/com.psychokernelupdater-1;
+  rm -r $root/system/priv-app/Spectrum;
+  cp /tmp/anykernel/spec/Spectrum.apk $root/data/app/org.frap129.spectrum-1/base.apk;
+  cp /tmp/anykernel/upd/Updater.apk $root/data/app/com.psychokernelupdater-1/base.apk;
+  cp /tmp/anykernel/upd/com.otaudater.feature.xml $root/system/etc/permissions/com.otaudater.feature.xml;
+  set_perm_recursive 0 0 0755 0644 $root/data/app/org.frap129.spectrum-1;
+  set_perm_recursive 0 0 0755 0644 $root/data/app/com.psychokernelupdater-1;
+  set_perm_recursive 0 0 0755 0644 $root/system/etc/permissions;
   mount -o ro,remount -t auto /system;
 fi;
 

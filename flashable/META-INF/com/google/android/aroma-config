@@ -27,11 +27,10 @@
 
 # ROM Info
 ini_set("rom_name", "Psycho Kernel");
-ini_set("rom_version", "4.0");
+ini_set("rom_version", "v5.0");
 ini_set("rom_author", "Psycho-Mods");
 ini_set("rom_device", "LeEco Le 1s");
-ini_set("rom_date", "May, 27 2017");
-ini_set("rom_code", "Shade");
+ini_set("rom_date", "July, 21 2017");
 
 ini_set("force_colorspace", "rgba");
 splash(
@@ -72,7 +71,7 @@ viewbox(
 	"</b> for <b>"+ini_get("rom_device")+"</b>.\n"+
     "A performance based Battery friendly Kernel With Some Psycho Mods.\n\n"+
       "  VERSION\t: <b><#selectbg_g>"+ini_get("rom_version")+"</#></b>\n"+
-      "  CODENAME\t: <b><#selectbg_g>"+ini_get("rom_code")+"</#></b>\n"+
+      "  CODENAME\t: <b><#selectbg_g>Wizard</#></b>\n"+
       "  UPDATED\t: <b><#selectbg_g>"+ini_get("rom_date")+"</#></b>",
     "@welcome"
 );

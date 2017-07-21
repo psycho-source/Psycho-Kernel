@@ -23,11 +23,11 @@
 #endif
 
 #ifdef CONFIG_ZSMALLOC
-#include <zsmalloc.h>
+#include <linux/zsmalloc.h>
 #endif
 
 #ifdef CONFIG_ZRAM
-#include <zram_drv.h>
+#include <linux/zram_drv.h>
 #endif
 
 /* for collecting ion total memory usage*/
@@ -725,7 +725,7 @@ int mlog_doread(char __user *buf, size_t len)
 			v = '\n';
 		}
 		/* MLOG_PRINTK("[mlog] %d: %s\n", strfmt_idx, strfmt_list[strfmt_idx]); */
-		size = sprintf(mlog_str, strfmt_list[strfmt_idx++], v);
+        size = snprintf(mlog_str, MLOG_STR_LEN, strfmt_list[strfmt_idx++], v);
 
 		if (strfmt_idx >= strfmt_len)
 			strfmt_idx = strfmt_proc;
@@ -755,7 +755,7 @@ static void mlog_timer_handler(unsigned long data)
 {
 	mlog(MLOG_TRIGGER_TIMER);
 
-	mod_timer(&mlog_timer, jiffies + timer_intval);
+	mod_timer(&mlog_timer, round_jiffies(jiffies + timer_intval));
 }
 
 static void mlog_init_logger(void)

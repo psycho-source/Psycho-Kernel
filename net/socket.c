@@ -1431,7 +1431,7 @@ out_release:
 SYSCALL_DEFINE4(socketpair, int, family, int, type, int, protocol,
 		int __user *, usockvec)
 {
-	struct socket *sock1, *sock2;
+	struct socket *sock1 = NULL, *sock2 = NULL;
 	int fd1, fd2, err;
 	struct file *newfile1, *newfile2;
 	int flags;
@@ -2381,8 +2381,10 @@ int __sys_recvmmsg(int fd, struct mmsghdr __user *mmsg, unsigned int vlen,
 		return err;
 
 	err = sock_error(sock->sk);
-	if (err)
+	if (err) {
+		datagrams = err;
 		goto out_put;
+	}
 
 	entry = mmsg;
 	compat_entry = (struct compat_mmsghdr __user *)mmsg;
