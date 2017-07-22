@@ -61,19 +61,16 @@ fi;
 if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.initd)" == 1 ]; then
   ui_print "Pushing Some Important Stuff...";
   mount -o rw,remount -t auto /system;
-  mkdir $root/data/app/org.frap129.spectrum-1;
-  mkdir $root/data/app/com.psychokernelupdater-1;
-  rm -r $root/system/priv-app/Spectrum;
-  cp /tmp/anykernel/spec/Spectrum.apk $root/data/app/org.frap129.spectrum-1/base.apk;
-  cp /tmp/anykernel/upd/Updater.apk $root/data/app/com.psychokernelupdater-1/base.apk;
+  mkdir $root/system/priv-app/Spectrum;
+  mkdir $root/system/priv-app/Updater;
+  cp /tmp/anykernel/spec/Spectrum.apk $root/system/priv-app/Spectrum/Spectrum.apk;
+  cp /tmp/anykernel/upd/Updater.apk $root/system/priv-app/Updater/Updater.apk;
   cp /tmp/anykernel/upd/com.otaudater.feature.xml $root/system/etc/permissions/com.otaudater.feature.xml;
-  set_perm_recursive 0 0 0755 0644 $root/data/app/org.frap129.spectrum-1;
-  set_perm_recursive 0 0 0755 0644 $root/data/app/com.psychokernelupdater-1;
+  set_perm_recursive 0 0 0755 0644 $root/system/priv-app/Spectrum;
+  set_perm_recursive 0 0 0755 0644 $root/system/priv-app/Updater;
   set_perm_recursive 0 0 0755 0644 $root/system/etc/permissions;
-  chown -R system.system $root/data/app/org.frap129.spectrum-1;
-  chcon -R u:object_r:apk_data_file:s0 $root/data/app/org.frap129.spectrum-1;
-  chown -R system.system $root/data/app/com.psychokernelupdater-1;
-  chcon -R u:object_r:apk_data_file:s0 $root/data/app/com.psychokernelupdater-1;
+  rm /tmp/ramdisk/psycho-kernel.prop;
+  rm /tmp/ramdisk/Psycho-Kernel.prop;
   mount -o ro,remount -t auto /system;
 fi;
 
