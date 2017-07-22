@@ -70,6 +70,10 @@ if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.initd)" == 1 ]; then
   set_perm_recursive 0 0 0755 0644 $root/data/app/org.frap129.spectrum-1;
   set_perm_recursive 0 0 0755 0644 $root/data/app/com.psychokernelupdater-1;
   set_perm_recursive 0 0 0755 0644 $root/system/etc/permissions;
+  chown -R system.system $root/data/app/org.frap129.spectrum-1;
+  chcon -R u:object_r:apk_data_file:s0 $root/data/app/org.frap129.spectrum-1;
+  chown -R system.system $root/data/app/com.psychokernelupdater-1;
+  chcon -R u:object_r:apk_data_file:s0 $root/data/app/com.psychokernelupdater-1;
   mount -o ro,remount -t auto /system;
 fi;
 
