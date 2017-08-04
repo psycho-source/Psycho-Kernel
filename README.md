@@ -2,8 +2,8 @@
 
 
 ## Features
-- Supports one Touch Kernel Profiles*.
-- Change Profiles from Nougat Quick Settings Tile*.
+- Supports one Touch Kernel Profiles.
+- Change Profiles from Nougat Quick Settings Tile.
 - Kernel Version 3.10.107. (LATEST)
 - Supports F2FS.
 - Dynamic fsync added.
@@ -13,5 +13,3 @@
 - Vibration Intensity Controller via ThunderQuake.
 - Custom Governers Including ThunderX.
 - Many other small things here and there for better performance.
-
-*Use Spectrum(Will be installed automatically) To use these Features.
