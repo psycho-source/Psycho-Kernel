@@ -1,8 +1,8 @@
 ##Changelogs
 
 
-Supports one Touch Kernel Profiles*.
-Change Profiles from Nougat Quick Settings Tile*.
+Supports one Touch Kernel Profiles.
+Change Profiles from Nougat Quick Settings Tile.
 Added Kernel Updater App.
 Kernel Version 3.10.107. (LATEST)
 Supports F2FS.
@@ -13,5 +13,3 @@ Ported ThunderPLug(Load based Hot plugging) for better battery and performance.
 Vibration Intensity Controller via ThunderQuake.
 Custom Governers Including ThunderX.
 Many other small things here and there for better performance.
-
-*Use Spectrum(Will be installed automatically) To use these Features.

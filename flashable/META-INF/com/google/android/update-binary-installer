@@ -61,16 +61,15 @@ fi;
 if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.initd)" == 1 ]; then
   ui_print "Pushing Some Important Stuff...";
   mount -o rw,remount -t auto /system;
-  mkdir $root/system/priv-app/Spectrum;
-  mkdir $root/system/priv-app/Updater;
-  cp /tmp/anykernel/spec/Spectrum.apk $root/system/priv-app/Spectrum/Spectrum.apk;
-  cp /tmp/anykernel/upd/Updater.apk $root/system/priv-app/Updater/Updater.apk;
-  cp /tmp/anykernel/upd/com.otaudater.feature.xml $root/system/etc/permissions/com.otaudater.feature.xml;
-  set_perm_recursive 0 0 0755 0644 $root/system/priv-app/Spectrum;
-  set_perm_recursive 0 0 0755 0644 $root/system/priv-app/Updater;
-  set_perm_recursive 0 0 0755 0644 $root/system/etc/permissions;
+  rm -r $root/system/priv-app/Spectrum;
+  rm -r $root/system/priv-app/Updater;
+  rm $root/system/etc/permissions/com.otaudater.feature.xml;
+  cp -r /tmp/anykernel/Manager/com.psychokernelupdater-1 $root/data/app/com.psychokernelupdater-1;
+  set_perm_recursive 0 0 0755 0644 $root/data/app/com.psychokernelupdater-1;
   rm /tmp/ramdisk/psycho-kernel.prop;
   rm /tmp/ramdisk/Psycho-Kernel.prop;
+  sed -i 's:ro.product.device=.*:ro.product.device=X3:' $root/system/build.prop;
+  sed -i 's:ro.build.product=.*:ro.build.product=X3:' $root/system/build.prop;
   mount -o ro,remount -t auto /system;
 fi;
 
@@ -102,5 +101,5 @@ umount /system;
 umount /data;
 ui_print "Done!";
 ui_print " ";
-ui_print"Go Psycho!";
+ui_print "Go Psycho!";
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VER="-v5.0"
+VER="-v6.0"
 CODE="Kernel"
 BASEVER="Psycho-"
 if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
