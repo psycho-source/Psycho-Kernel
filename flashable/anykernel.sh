@@ -50,7 +50,7 @@ append_file init.mt6795.rc "dvbootscript" init.mt6795;
 
 # fstab.mt6795
 backup_file fstab.mt6795;
-patch_fstab fstab.mt6795 /system ext4 options "nodiratime,barrier=0" "nodev,noatime,nodiratime,barrier=0,data=writeback,noauto_da_alloc,discard";
+patch_fstab fstab.mt6795 /system ext4 options "nodiratime,barrier=0" "ro,nodev,noatime,nodiratime,barrier=0,data=writeback,noauto_da_alloc,discard";
 patch_fstab fstab.mt6795 /cache ext4 options "barrier=0,nomblk_io_submit" "nosuid,nodev,noatime,nodiratime,errors=panic,barrier=0,nomblk_io_submit,data=writeback,noauto_da_alloc";
 patch_fstab fstab.mt6795 /data ext4 options "nomblk_io_submit,data=writeback" "nosuid,nodev,noatime,errors=panic,nomblk_io_submit,data=writeback,noauto_da_alloc";
 append_file fstab.mt6795 "usbdisk" fstab;
