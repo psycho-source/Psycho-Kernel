@@ -64,8 +64,10 @@ if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.initd)" == 1 ]; then
   rm -r $root/system/priv-app/Spectrum;
   rm -r $root/system/priv-app/Updater;
   rm $root/system/etc/permissions/com.otaudater.feature.xml;
-  cp -r /tmp/anykernel/Manager/com.psychokernelupdater-1 $root/data/app/com.psychokernelupdater-1;
-  set_perm_recursive 0 0 0755 0644 $root/data/app/com.psychokernelupdater-1;
+  rm -r $root/data/app/com.psychokernelupdater-1;
+  mkdir $root/system/priv-app/KernelManager;
+  cp -r /tmp/anykernel/Manager/KernelManager $root/system/priv-app/KernelManager;
+  set_perm_recursive 0 0 0755 0644 $root/system/priv-app/KernelManager;
   rm /tmp/ramdisk/psycho-kernel.prop;
   rm /tmp/ramdisk/Psycho-Kernel.prop;
   sed -i 's:ro.product.device=.*:ro.product.device=X3:' $root/system/build.prop;

@@ -16,7 +16,7 @@ before_script:
 - git clone --depth=50 --branch=master https://github.com/psycho-source/Psycho-Kernel
   $HOME/kernel
 script:
-- export KBUILD_BUILD_USER="wItS"
+- export KBUILD_BUILD_USER="Psycho-Mods"
 - export KBUILD_BUILD_HOST="Psycho-Kernel"
 - export ARCH=arm64
 - export SUBARCH=arm64
