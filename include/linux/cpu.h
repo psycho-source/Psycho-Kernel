@@ -126,26 +126,14 @@ enum {
 		{ .notifier_call = fn, .priority = pri };	\
 	register_cpu_notifier(&fn##_nb);			\
 }
-
-#define __cpu_notifier(fn, pri) {				\
-	static struct notifier_block fn##_nb =			\
-		{ .notifier_call = fn, .priority = pri };	\
-	__register_cpu_notifier(&fn##_nb);			\
-}
-
 extern int register_cpu_notifier(struct notifier_block *nb);
 extern int __register_cpu_notifier(struct notifier_block *nb);
 extern void unregister_cpu_notifier(struct notifier_block *nb);
-extern void __unregister_cpu_notifier(struct notifier_block *nb);
-extern int __register_cpu_notifier(struct notifier_block *nb);
+
 #else /* #if defined(CONFIG_HOTPLUG_CPU) || !defined(MODULE) */
 #define cpu_notifier(fn, pri)	do { (void)(fn); } while (0)
-static inline int register_cpu_notifier(struct notifier_block *nb)
-{
-	return 0;
-}
 
-static inline int __register_cpu_notifier(struct notifier_block *nb)
+static inline int register_cpu_notifier(struct notifier_block *nb)
 {
 	return 0;
 }
@@ -270,7 +258,6 @@ void cpu_startup_entry(enum cpuhp_state state);
 void cpu_idle(void);
 
 void cpu_idle_poll_ctrl(bool enable);
-void per_cpu_idle_poll_ctrl(int cpu, bool enable);
 
 void arch_cpu_idle(void);
 void arch_cpu_idle_prepare(void);

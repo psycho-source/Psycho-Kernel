@@ -541,21 +541,6 @@ static inline bool mem_cgroup_is_root(struct mem_cgroup *memcg)
 	return (memcg == root_mem_cgroup);
 }
 
-#ifdef CONFIG_MEMCG_ZNDSWAP
-/* add_to_swap -> get_swap_page_by_memcg -> .. */
-bool memcg_is_root(struct page *page)
-{
-	struct page_cgroup *pc;
-
-	if (mem_cgroup_disabled())
-		return true;
-
-	pc = lookup_page_cgroup(page);
-
-	return mem_cgroup_is_root(pc->mem_cgroup);
-}
-#endif
-
 /* Writing them here to avoid exposing memcg's inner layout */
 #if defined(CONFIG_INET) && defined(CONFIG_MEMCG_KMEM)
 
@@ -2456,7 +2441,7 @@ static void drain_stock(struct memcg_stock_pcp *stock)
  */
 static void drain_local_stock(struct work_struct *dummy)
 {
-	struct memcg_stock_pcp *stock = this_cpu_ptr(&memcg_stock);
+	struct memcg_stock_pcp *stock = &__get_cpu_var(memcg_stock);
 	drain_stock(stock);
 	clear_bit(FLUSHING_CACHED_CHARGE, &stock->flags);
 }
@@ -7078,12 +7063,6 @@ static int __init mem_cgroup_init(void)
 	enable_swap_cgroup();
 	mem_cgroup_soft_limit_tree_init();
 	memcg_stock_init();
-#ifdef CONFIG_MEMCG_ZNDSWAP
-	dt_swapcache = 2560;
-	dt_writeback = 1024;
-	dt_filecache = totalram_pages;
-	/*dt_free = ;*/
-#endif
 	return 0;
 }
 subsys_initcall(mem_cgroup_init);

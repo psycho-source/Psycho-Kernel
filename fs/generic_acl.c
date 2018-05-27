@@ -83,7 +83,7 @@ generic_acl_set(struct dentry *dentry, const char *name, const void *value,
 	}
 	if (acl) {
 		struct posix_acl *old_acl;
-		
+
 		error = posix_acl_valid(acl);
 		if (error)
 			goto failed;

@@ -1091,7 +1091,7 @@ static int sched_rt_runtime_exceeded(struct rt_rq *rt_rq)
 
 	if (rt_rq->rt_time > runtime) {
 		struct rt_bandwidth *rt_b = sched_rt_bandwidth(rt_rq);
-		int cpu = rq_cpu(rt_rq->rq);
+		int cpu = cpu_of(rt_rq->rq);
 
 		printk_deferred("sched: cpu=%d rt_time %llu <-> runtime"
 				" [%llu -> %llu], exec_task[%d:%s], prio=%d, exec_delta_time[%llu]"
@@ -1151,7 +1151,7 @@ static void update_curr_rt(struct rq *rq)
 	struct sched_rt_entity *rt_se = &curr->rt;
 	struct rt_rq *rt_rq = rt_rq_of_se(rt_se);
 	u64 delta_exec;
-	int cpu = rq_cpu(rq);
+	int cpu = cpu_of(rq);
 
 	if (curr->sched_class != &rt_sched_class)
 		return;
@@ -1550,12 +1550,7 @@ select_task_rq_rt(struct task_struct *p, int sd_flag, int flags)
 #endif
 		int target = find_lowest_rq(p);
 
-		/*
-		 * Don't bother moving it if the destination CPU is
-		 * not running a lower priority task.
-		 */
-		if (target != -1 &&
-                    p->prio < cpu_rq(target)->rt.highest_prio.curr)
+		if (target != -1)
 			cpu = target;
 
 		mt_sched_printf(sched_rt_info, "2. select_task_rq_rt %d:%s to cpu=%d", p->pid, p->comm, cpu);
@@ -2223,16 +2218,6 @@ static struct rq *find_lock_lowest_rq(struct task_struct *task, struct rq *rq)
 
 		lowest_rq = cpu_rq(cpu);
 
-		if (lowest_rq->rt.highest_prio.curr <= task->prio) {
-			/*
-			 * Target rq has tasks of equal or higher priority,
-			 * retrying does not release any lock and is unlikely
-			 * to yield a different result.
-			 */
-			lowest_rq = NULL;
-			break;
-		}
-
 		/* if the prio of this runqueue changed, try again */
 		if (double_lock_balance(rq, lowest_rq)) {
 			/*
@@ -2302,16 +2287,6 @@ static struct rq *find_lock_lowest_rq_mtk(struct task_struct *task, struct rq *r
 		return NULL;
 
 	lowest_rq = cpu_rq(cpu);
-
-	if (lowest_rq->rt.highest_prio.curr <= task->prio) {
-		/*
-		 * Target rq has tasks of equal or higher priority,
-		 * retrying does not release any lock and is unlikely
-		 * to yield a different result.
-		 */
-		lowest_rq = NULL;
-		break;
-	}
 
 	/* if the prio of this runqueue changed, try again */
 	if (double_lock_balance(rq, lowest_rq)) {

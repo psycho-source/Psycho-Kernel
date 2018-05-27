@@ -1432,10 +1432,3 @@ static inline void account_reset_rq(struct rq *rq)
 	rq->prev_steal_time_rq = 0;
 #endif
 }
-
-#ifdef CONFIG_SMP
-static inline int rq_cpu(const struct rq *rq) { return rq->cpu; }
-#else
-static inline int rq_cpu(const struct rq *rq) { return 0; }
-#endif
-

@@ -81,15 +81,11 @@ static DEFINE_MUTEX(ashmem_mutex);
 static struct kmem_cache *ashmem_area_cachep __read_mostly;
 static struct kmem_cache *ashmem_range_cachep __read_mostly;
 
-static inline unsigned long range_size(struct ashmem_range *range)
-{
-	return range->pgend - range->pgstart + 1;
-}
+#define range_size(range) \
+	((range)->pgend - (range)->pgstart + 1)
 
-static inline bool range_on_lru(struct ashmem_range *range)
-{
-	return range->purged == ASHMEM_NOT_PURGED;
-}
+#define range_on_lru(range) \
+	((range)->purged == ASHMEM_NOT_PURGED)
 
 #define page_range_subsumes_range(range, start, end) \
 	(((range)->pgstart >= (start)) && ((range)->pgend <= (end)))
@@ -325,7 +321,6 @@ static int ashmem_mmap(struct file *file, struct vm_area_struct *vma)
 			ret = PTR_ERR(vmfile);
 			goto out;
 		}
-		vmfile->f_mode |= FMODE_LSEEK;
 		asma->file = vmfile;
 	}
 	get_file(asma->file);
@@ -376,7 +371,7 @@ static int ashmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		loff_t start = range->pgstart * PAGE_SIZE;
 		loff_t end = (range->pgend + 1) * PAGE_SIZE;
 
-		do_fallocate(range->asma->file,
+		range->asma->file->f_op->fallocate(range->asma->file,
 				FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
 				start, end - start);
 		range->purged = ASHMEM_WAS_PURGED;

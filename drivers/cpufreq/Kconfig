@@ -115,12 +115,6 @@ config CPU_FREQ_DEFAULT_GOV_CONSERVATIVE
 	  governor. If unsure have a look at the help section of the
 	  driver. Fallback governor will be the performance governor.
 
-config CPU_FREQ_DEFAULT_GOV_THUNDERX
-  bool "thunderx"
-  select CPU_FREQ_GOV_THUNDERX
-  help
-	Uses ThunderX as Yuor Default Governer
-
 config CPU_FREQ_DEFAULT_GOV_INTERACTIVE
 	bool "interactive"
 	select CPU_FREQ_GOV_INTERACTIVE
@@ -152,8 +146,16 @@ config CPU_FREQ_DEFAULT_GOV_HOTPLUG
 	  loading your cpufreq low-level hardware driver.
 	  Be aware that not all cpufreq drivers support the hotplug
 	  governor. If unsure have a look at the help section of the
-	  driver. Fallback governor will be the performance governor
+	  driver. Fallback governor will be the performance governor.
 
+config CPU_FREQ_DEFAULT_GOV_THUNDERX
+  bool "thunderx"
+  select CPU_FREQ_GOV_THUNDERX
+  help
+	  ThunderX CPU Governor is a special power-biased CPU governor
+		for Mediatek SoCs Using smartassv2 as base, and  with optimizations
+	  for MTK SoCs added on top, ThunderX	does not compromise UX and is
+	  an ultimate choice to keep your phone juiced up.
 
 endchoice
 
@@ -162,11 +164,11 @@ config CPU_FREQ_GOV_BALANCE
 	select CPU_FREQ_TABLE
 	help
 	  'balance' - This driver adds a dynamic cpufreq policy governor.
-	  The governor does a periodic polling and 
+	  The governor does a periodic polling and
 	  changes frequency based on the CPU utilization.
 	  The support for this governor depends on CPU capability to
 	  do fast frequency switching (i.e, very low latency frequency
-	  transitions). 
+	  transitions).
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called cpufreq_hotplug.
@@ -291,12 +293,6 @@ config CPU_FREQ_GOV_CONSERVATIVE
 
 	  If in doubt, say N.
 
-config CPU_FREQ_GOV_THUNDERX
-  tristate "'thunderx' cpufreq governor"
-  depends on CPU_FREQ
-  help
-    'thunderx' - a "power optimized" governor for Mediatek SoCs
-
 config CPU_FREQ_GOV_HOTPLUG
 	tristate "'hotplug' cpufreq policy governor"
 	select CPU_FREQ_TABLE
@@ -316,6 +312,11 @@ config CPU_FREQ_GOV_HOTPLUG
 
 	  If in doubt, say N.
 
+config CPU_FREQ_GOV_THUNDERX
+	tristate "'thunderx' cpufreq governor"
+	depends on CPU_FREQ
+	help
+		 'thunderx' - a "power optimized" governor for Mediatek SoCs
 
 config GENERIC_CPUFREQ_CPU0
 	tristate "Generic CPU0 cpufreq driver"

@@ -36,10 +36,7 @@
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/sd.h>
 
-#define FEATURE_STORAGE_PERF_INDEX
-#if !defined(CONFIG_MT_ENG_BUILD)
-#undef FEATURE_STORAGE_PERF_INDEX
-#endif
+#include <linux/math64.h>
 
 #include "core.h"
 #include "bus.h"
@@ -84,8 +81,35 @@ static const unsigned freqs[] = { 300000, 260000, 200000, 100000 };
  * performance cost, and for other reasons may not always be desired.
  * So we allow it it to be disabled.
  */
-bool use_spi_crc = 0;
-module_param(use_spi_crc, bool, 0644);
+bool use_spi_crc = 1;
+module_param(use_spi_crc, bool, 0);
+
+static inline void
+mmc_update_latency_hist(struct mmc_host *host, int read, u_int64_t delta_us)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(latency_x_axis_us); i++) {
+		if (delta_us < (u_int64_t)latency_x_axis_us[i]) {
+			if (read)
+				host->latency_y_axis_read[i]++;
+			else
+				host->latency_y_axis_write[i]++;
+			break;
+		}
+	}
+	if (i == ARRAY_SIZE(latency_x_axis_us)) {
+		/* Overflowed the histogram */
+		if (read)
+			host->latency_y_axis_read[i]++;
+		else
+			host->latency_y_axis_write[i]++;
+	}
+	if (read)
+		host->latency_reads_elems++;
+	else
+		host->latency_writes_elems++;
+}
 
 /*
  * We normally treat cards as removed during suspend if they are not
@@ -197,6 +221,17 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 			pr_debug("%s:     %d bytes transferred: %d\n",
 				mmc_hostname(host),
 				mrq->data->bytes_xfered, mrq->data->error);
+			if (mrq->lat_hist_enabled) {
+				ktime_t completion;
+				u_int64_t delta_us;
+
+				completion = ktime_get();
+				delta_us = ktime_us_delta(completion,
+							  mrq->io_start);
+				mmc_update_latency_hist(host,
+					(mrq->data->flags & MMC_DATA_READ),
+					delta_us);
+			}
 			trace_mmc_blk_rw_end(cmd->opcode, cmd->arg, mrq->data);
 		}
 
@@ -483,8 +518,8 @@ static void mmc_wait_for_req_done(struct mmc_host *host,
         }
 
 #if 0
-    if ((mrq->cmd->arg == 0) && (mrq->data) && 
-            ((mrq->cmd->opcode == 17)||(mrq->cmd->opcode == 18))){ 
+    if ((mrq->cmd->arg == 0) && (mrq->data) &&
+            ((mrq->cmd->opcode == 17)||(mrq->cmd->opcode == 18))){
         printk("read MBR  cmd%d: blocks %d arg %08x, sg_len = %d\n", mrq->cmd->opcode, mrq->data->blocks, mrq->cmd->arg, mrq->data->sg_len);
             sg = mrq->data->sg;
             num = mrq->data->sg_len;
@@ -505,9 +540,9 @@ static void mmc_wait_for_req_done(struct mmc_host *host,
                 /* physic addr */
                 //paddr = page_to_phys(page);
 
-                sg = sg_next(sg); 
+                sg = sg_next(sg);
                 num--;
-            }; 
+            };
     }
 #endif
 
@@ -581,28 +616,12 @@ static void mmc_post_req(struct mmc_host *host, struct mmc_request *mrq,
  *	is returned without waiting. NULL is not an error condition.
  */
 
-#if defined(FEATURE_STORAGE_PERF_INDEX)
-extern bool start_async_req[];
-extern unsigned long long start_async_req_time[];
-extern unsigned int find_mmcqd_index(void);
-extern unsigned long long mmcqd_t_usage_wr[];
-extern unsigned long long mmcqd_t_usage_rd[];
-extern unsigned int mmcqd_rq_size_wr[];
-extern unsigned int mmcqd_rq_size_rd[];
-extern unsigned int mmcqd_rq_count[]; 
-extern unsigned int mmcqd_wr_rq_count[];
-extern unsigned int mmcqd_rd_rq_count[];
-#endif
-
 struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 				    struct mmc_async_req *areq, int *error)
 {
 	int err = 0;
 	int start_err = 0;
-#if defined(FEATURE_STORAGE_PERF_INDEX)
-    unsigned long long time1 = 0;
-    unsigned int idx = 0;
-#endif
+
 	struct mmc_async_req *data = host->areq;
 
 #if defined(FEATURE_MET_MMC_INDEX)
@@ -642,32 +661,6 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 				host->ops->tuning(host, host->areq->mrq);	//add for MTK msdc host <Yuchi Xu>
 			}while(host->ops->check_written_data(host,host->areq->mrq));
 
-#if defined(FEATURE_STORAGE_PERF_INDEX)
-			time1 = sched_clock();
-
-        	idx = find_mmcqd_index();
-			if (start_async_req[idx] == 1)
-			{
-				//idx = find_mmcqd_index();
-				mmcqd_rq_count[idx]++;
-
-				if(host->areq->mrq->data->flags == MMC_DATA_WRITE)
-				{
-					mmcqd_wr_rq_count[idx]++;
-					mmcqd_rq_size_wr[idx] += ((host->areq->mrq->data->blocks) * (host->areq->mrq->data->blksz));
-					mmcqd_t_usage_wr[idx] += time1 - start_async_req_time[idx];
-				}
-				else if (host->areq->mrq->data->flags == MMC_DATA_READ)
-				{
-					mmcqd_rd_rq_count[idx]++;
-					mmcqd_rq_size_rd[idx] += ((host->areq->mrq->data->blocks) * (host->areq->mrq->data->blksz));
-					mmcqd_t_usage_rd[idx] += time1 - start_async_req_time[idx];
-				}
-
-				start_async_req[idx] = 0;
-			}
-#endif
-
 			err = host->areq->err_check(host->card, host->areq);
 		}
 		/*
@@ -685,15 +678,15 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 	}
 
 	if (!err && areq) {
+		if (host->latency_hist_enabled) {
+			areq->mrq->io_start = ktime_get();
+			areq->mrq->lat_hist_enabled = 1;
+		} else
+			areq->mrq->lat_hist_enabled = 0;
 		trace_mmc_blk_rw_start(areq->mrq->cmd->opcode,
 				       areq->mrq->cmd->arg,
 				       areq->mrq->data);
 		start_err = __mmc_start_data_req(host, areq->mrq);
-#if defined(FEATURE_STORAGE_PERF_INDEX)
-		start_async_req[idx] = 1;
-		start_async_req_time[idx] = sched_clock();
-#endif
-
 	}
 
 	if (host->areq) {
@@ -761,8 +754,8 @@ int mmc_interrupt_hpi_delay(struct mmc_card *card, u32 delay)
 		return 1;
 	}
 
-	mmc_claim_host(card->host);	
-		
+	mmc_claim_host(card->host);
+
 	do {
 		err = mmc_send_status(card, &status);
 		if (err) {
@@ -784,7 +777,7 @@ int mmc_interrupt_hpi_delay(struct mmc_card *card, u32 delay)
 		 * In idle and transfer states, HPI is not needed and the caller
 		 * can issue the next intended command immediately
 		 */
-		pr_err("[%s]: %s: card release busy status before stopping by HPI, wait %dms\n", __func__, mmc_hostname(card->host), delay_count); 
+		pr_err("[%s]: %s: card release busy status before stopping by HPI, wait %dms\n", __func__, mmc_hostname(card->host), delay_count);
 		goto out;
 	case R1_STATE_PRG:
 		pr_err("[%s]: %s: do HPI to stop flush ops, wait %dms.\n", __func__, mmc_hostname(card->host), delay_count);
@@ -818,7 +811,7 @@ out:
 
 int mmc_interrupt_hpi(struct mmc_card *card)
 {
-	return mmc_interrupt_hpi_delay(card, 0); 
+	return mmc_interrupt_hpi_delay(card, 0);
 }
 
 #else
@@ -917,13 +910,13 @@ void mmc_start_flush(struct mmc_card *card)
 
 	//printk("[%s]: mmc_start_flush_doing.\n", __func__);
 	mmc_card_set_doing_flush(card);
-	err = mmc_flush_cache(card); 
+	err = mmc_flush_cache(card);
 	if (err) {
 		pr_warn("%s: Error %d starting flush ops\n",
 			mmc_hostname(card->host), err);
 		goto out;
 	}
-		
+
 out:
 	mmc_release_host(card->host);
 }
@@ -1879,10 +1872,10 @@ void mmc_power_off(struct mmc_host *host)
 
 	host->ios.clock = 0;
 	host->ios.vdd = 0;
-	
+
 #ifdef CONFIG_MTK_EMMC_CACHE
     if (host->card && (mmc_card_mmc(host->card)) && (host->card->ext_csd.cache_ctrl & 0x1)) {
-        if (mmc_cache_ctrl(host, 0)) {
+        if (mmc_flush_cache(host->card)) {
             pr_err("%s: failed to disable cache\n", mmc_hostname(host));
             return ;
         }
@@ -2119,7 +2112,7 @@ void mmc_init_erase(struct mmc_card *card)
 }
 
 static unsigned int mmc_mmc_erase_timeout(struct mmc_card *card,
-				          unsigned int arg, unsigned int qty)
+					  unsigned int arg, unsigned int qty)
 {
 	unsigned int erase_timeout;
 
@@ -2420,7 +2413,7 @@ int mmc_can_trim(struct mmc_card *card)
 		!(card->quirks & MMC_QUIRK_TRIM_UNSTABLE) &&
 		!(card->quirks & MMC_QUIRK_KSI_V03_SKIP_TRIM))
 		return 1;
-	//printk(KERN_ERR "[%s]: quirks=0x%x, MMC_QUIRK_TRIM_UNSTABLE=0x%x\n", __func__, card->quirks, MMC_QUIRK_TRIM_UNSTABLE); 
+	//printk(KERN_ERR "[%s]: quirks=0x%x, MMC_QUIRK_TRIM_UNSTABLE=0x%x\n", __func__, card->quirks, MMC_QUIRK_TRIM_UNSTABLE);
 	//printk(KERN_ERR "[%s]: quirks=0x%x, MMC_QUIRK_KSI_V03_SKIP_TRIM=0x%x\n", __func__, card->quirks, MMC_QUIRK_KSI_V03_SKIP_TRIM);
 	return 0;
 }
@@ -3046,52 +3039,6 @@ int mmc_flush_cache(struct mmc_card *card)
 }
 EXPORT_SYMBOL(mmc_flush_cache);
 
-/*
- * Turn the cache ON/OFF.
- * Turning the cache OFF shall trigger flushing of the data
- * to the non-volatile storage.
- * This function should be called with host claimed
- */
-int mmc_cache_ctrl(struct mmc_host *host, u8 enable)
-{
-	struct mmc_card *card = host->card;
-	unsigned int timeout;
-	int err = 0;
-
-#ifdef CONFIG_MTK_EMMC_CACHE
-	//printk("[%s]: enable=%d, caps=0x%x, CACHE_FLAG=0x%x, quirks=0x%x, CACHE_QUIRK=0x%x\n", __func__, enable, host->caps2, MMC_CAP2_CACHE_CTRL, card->quirks, MMC_QUIRK_DISABLE_CACHE); 
-	if (!(host->caps2 & MMC_CAP2_CACHE_CTRL) ||
-			mmc_card_is_removable(host) || 
-			(card->quirks & MMC_QUIRK_DISABLE_CACHE)) 
-		return err;
-#else
-	if (!(host->caps2 & MMC_CAP2_CACHE_CTRL) ||
-			mmc_card_is_removable(host))
-		return err;
-#endif
-
-	if (card && mmc_card_mmc(card) &&
-			(card->ext_csd.cache_size > 0)) {
-		enable = !!enable;
-
-		if (card->ext_csd.cache_ctrl ^ enable) {
-			timeout = enable ? card->ext_csd.generic_cmd6_time : 0;
-			err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-					EXT_CSD_CACHE_CTRL, enable, timeout);
-			if (err)
-				pr_err("%s: cache %s error %d\n",
-						mmc_hostname(card->host),
-						enable ? "on" : "off",
-						err);
-			else
-				card->ext_csd.cache_ctrl = enable;
-		}
-	}
-
-	return err;
-}
-EXPORT_SYMBOL(mmc_cache_ctrl);
-
 #ifdef CONFIG_PM
 
 /**
@@ -3378,6 +3325,124 @@ static void __exit mmc_exit(void)
 	mmc_unregister_host_class();
 	mmc_unregister_bus();
 	destroy_workqueue(workqueue);
+}
+
+/*
+ * MMC IO latency support. We want this to be as cheap as possible, so doing
+ * this lockless (and avoiding atomics), a few off by a few errors in this
+ * code is not harmful, and we don't want to do anything that is
+ * perf-impactful.
+ * TODO : If necessary, we can make the histograms per-cpu and aggregate
+ * them when printing them out.
+ */
+static void
+mmc_zero_latency_hist(struct mmc_host *host)
+{
+	memset(host->latency_y_axis_read, 0,
+	       sizeof(host->latency_y_axis_read));
+	memset(host->latency_y_axis_write, 0,
+	       sizeof(host->latency_y_axis_write));
+	host->latency_reads_elems = 0;
+	host->latency_writes_elems = 0;
+}
+
+static ssize_t
+latency_hist_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int i;
+	struct mmc_host *host = cls_dev_to_mmc_host(dev);
+	int bytes_written = 0;
+	u_int64_t num_elem, elem;
+	int pct;
+
+	num_elem = host->latency_reads_elems;
+	if (num_elem > 0) {
+		bytes_written += scnprintf(buf + bytes_written,
+			   PAGE_SIZE - bytes_written,
+			   "IO svc_time Read Latency Histogram :\n");
+		for (i = 0;
+		     i < ARRAY_SIZE(latency_x_axis_us);
+		     i++) {
+			elem = host->latency_y_axis_read[i];
+			pct = div64_u64(elem * 100, num_elem);
+			bytes_written += scnprintf(buf + bytes_written,
+						   PAGE_SIZE - bytes_written,
+						   "\t< %5lluus%15llu%15d%%\n",
+						   latency_x_axis_us[i],
+						   elem, pct);
+		}
+		/* Last element in y-axis table is overflow */
+		elem = host->latency_y_axis_read[i];
+		pct = div64_u64(elem * 100, num_elem);
+		bytes_written += scnprintf(buf + bytes_written,
+					   PAGE_SIZE - bytes_written,
+					   "\t> %5dms%15llu%15d%%\n", 10,
+					   elem, pct);
+	}
+	num_elem = host->latency_writes_elems;
+	if (num_elem > 0) {
+		bytes_written += scnprintf(buf + bytes_written,
+				   PAGE_SIZE - bytes_written,
+				   "IO svc_time Write Latency Histogram :\n");
+		for (i = 0;
+		     i < ARRAY_SIZE(latency_x_axis_us);
+		     i++) {
+			elem = host->latency_y_axis_write[i];
+			pct = div64_u64(elem * 100, num_elem);
+			bytes_written += scnprintf(buf + bytes_written,
+						   PAGE_SIZE - bytes_written,
+						   "\t< %5lluus%15llu%15d%%\n",
+						   latency_x_axis_us[i],
+						   elem, pct);
+		}
+		/* Last element in y-axis table is overflow */
+		elem = host->latency_y_axis_write[i];
+		pct = div64_u64(elem * 100, num_elem);
+		bytes_written += scnprintf(buf + bytes_written,
+					   PAGE_SIZE - bytes_written,
+					   "\t> %5dms%15llu%15d%%\n", 10,
+					   elem, pct);
+	}
+	return bytes_written;
+}
+/*
+ * Values permitted 0, 1, 2.
+ * 0 -> Disable IO latency histograms (default)
+ * 1 -> Enable IO latency histograms
+ * 2 -> Zero out IO latency histograms
+ */
+static ssize_t
+latency_hist_store(struct device *dev, struct device_attribute *attr,
+		   const char *buf, size_t count)
+{
+	struct mmc_host *host = cls_dev_to_mmc_host(dev);
+	long value;
+
+	if (kstrtol(buf, 0, &value))
+		return -EINVAL;
+	if (value == MMC_IO_LAT_HIST_ZERO)
+		mmc_zero_latency_hist(host);
+	else if (value == MMC_IO_LAT_HIST_ENABLE ||
+		 value == MMC_IO_LAT_HIST_DISABLE)
+		host->latency_hist_enabled = value;
+	return count;
+}
+
+static DEVICE_ATTR(latency_hist, S_IRUGO | S_IWUSR,
+		   latency_hist_show, latency_hist_store);
+
+void
+mmc_latency_hist_sysfs_init(struct mmc_host *host)
+{
+	if (device_create_file(&host->class_dev, &dev_attr_latency_hist))
+		dev_err(&host->class_dev,
+			"Failed to create latency_hist sysfs entry\n");
+}
+
+void
+mmc_latency_hist_sysfs_exit(struct mmc_host *host)
+{
+	device_remove_file(&host->class_dev, &dev_attr_latency_hist);
 }
 
 subsys_initcall(mmc_init);

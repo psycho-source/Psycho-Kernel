@@ -276,7 +276,6 @@ static enum power_supply_property battery_props[] = {
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_TECHNOLOGY,
 	POWER_SUPPLY_PROP_CAPACITY,
-	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	/* Add for Battery Service */
 	POWER_SUPPLY_PROP_batt_vol,
 	POWER_SUPPLY_PROP_batt_temp,
@@ -573,9 +572,6 @@ static int battery_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CAPACITY:
 		val->intval = data->BAT_CAPACITY;
 		break;
-	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-    	val->intval = data->BAT_batt_vol * 1000; /* uV */
- 		break;
 	case POWER_SUPPLY_PROP_batt_vol:
 		val->intval = data->BAT_batt_vol;
 		break;
@@ -1762,18 +1758,8 @@ static void battery_update(struct battery_data *bat_data)
 	kal_bool resetBatteryMeter = KAL_FALSE;
 
 	bat_data->BAT_TECHNOLOGY = POWER_SUPPLY_TECHNOLOGY_LION;
-	
- 	if (BMT_status.temperature == ERR_CHARGE_TEMPERATURE) {
- 		bat_data->BAT_HEALTH = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
- 	} else if (BMT_status.temperature < MIN_CHARGE_TEMPERATURE) {
- 		bat_data->BAT_HEALTH = POWER_SUPPLY_HEALTH_COLD;
- 	} else if (BMT_status.temperature >= MAX_CHARGE_TEMPERATURE) {
- 		bat_data->BAT_HEALTH = POWER_SUPPLY_HEALTH_OVERHEAT;
- 	} else {
- 		bat_data->BAT_HEALTH = POWER_SUPPLY_HEALTH_GOOD;
- 	}
- 
-	bat_data->BAT_batt_vol = BMT_status.bat_vol * 1000;
+	bat_data->BAT_HEALTH = POWER_SUPPLY_HEALTH_GOOD;
+	bat_data->BAT_batt_vol = BMT_status.bat_vol;
 	bat_data->BAT_batt_temp = BMT_status.temperature * 10;
 	bat_data->BAT_PRESENT = BMT_status.bat_exist;
 
@@ -1794,7 +1780,7 @@ static void battery_update(struct battery_data *bat_data)
 
 	} else {		/* Only Battery */
 
-		bat_data->BAT_STATUS = POWER_SUPPLY_STATUS_DISCHARGING;
+		bat_data->BAT_STATUS = POWER_SUPPLY_STATUS_NOT_CHARGING;
 		if (BMT_status.bat_vol <= V_0PERCENT_TRACKING)
 			resetBatteryMeter = mt_battery_0Percent_tracking_check();
 		else
@@ -2614,7 +2600,7 @@ static void mt_battery_thermal_check(void)
 #if defined(CONFIG_MTK_JEITA_STANDARD_SUPPORT)
 		/* ignore default rule */
 #else
-		if (BMT_status.temperature >= 50) {
+		if (BMT_status.temperature >= 60) {
 #if defined(CONFIG_POWER_EXT)
 			battery_log(BAT_LOG_CRTI,
 					    "[BATTERY] CONFIG_POWER_EXT, no update battery update power down.\n");
@@ -3674,7 +3660,7 @@ static int battery_probe(struct platform_device *dev)
 		battery_main.BAT_PRESENT = 1;
 		battery_main.BAT_TECHNOLOGY = POWER_SUPPLY_TECHNOLOGY_LION;
 		battery_main.BAT_CAPACITY = 100;
-		battery_main.BAT_batt_vol = 4200000;
+		battery_main.BAT_batt_vol = 4200;
 		battery_main.BAT_batt_temp = 220;
 
 		g_bat_init_flag = KAL_TRUE;

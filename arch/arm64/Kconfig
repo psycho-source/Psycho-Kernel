@@ -23,6 +23,8 @@ config ARM64
 	select HARDIRQS_SW_RESEND
 	select HAVE_ARCH_JUMP_LABEL
 	select HAVE_ARCH_AUDITSYSCALL
+	select HAVE_ARCH_MMAP_RND_BITS
+	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
 	select HAVE_ARCH_SECCOMP_FILTER
 	select HAVE_ARCH_KGDB
 	select HAVE_ARCH_TRACEHOOK
@@ -70,6 +72,27 @@ config MMU
 
 config NO_IOPORT
 	def_bool y
+
+config ARCH_MMAP_RND_BITS_MIN
+       default 14 if ARM64_64K_PAGES
+       default 18
+
+# max bits determined by the following formula:
+#  VA_BITS - PAGE_SHIFT - 3
+#  VA_BITS is always 39
+config ARCH_MMAP_RND_BITS_MAX
+       default 20 if ARM64_64K_PAGES
+       default 24
+
+config ARCH_MMAP_RND_COMPAT_BITS_MIN
+       default 11
+
+config ARCH_MMAP_RND_COMPAT_BITS_MAX
+       default 16
+
+config ILLEGAL_POINTER_VALUE
+	hex
+	default 0xdead000000000000
 
 config STACKTRACE_SUPPORT
 	def_bool y
@@ -623,16 +646,6 @@ config ARMV7_COMPAT
 
 	 If you want to execute ARMv7 applications, say Y
 
-config ARMV7_COMPAT_CPUINFO
-	bool "Report backwards compatible cpu features in /proc/cpuinfo"
-	depends on ARMV7_COMPAT
-	default y
-	help
-	 This option makes /proc/cpuinfo list CPU features that an ARMv7 or
-	 earlier kernel would report, but are not optional on an ARMv8 or later
-	 processor.
-
-	 If you want to execute ARMv7 applications, say Y
 
 source "mm/Kconfig"
 
@@ -774,5 +787,4 @@ source "arch/arm64/crypto/Kconfig"
 endif
 
 source "lib/Kconfig"
-
 source "arch/arm64/hotplug/Kconfig"

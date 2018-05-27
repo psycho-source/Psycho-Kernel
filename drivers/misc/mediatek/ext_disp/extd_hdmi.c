@@ -1355,10 +1355,10 @@ void hdmi_init(void)
 #endif
 
 #if 1
-struct proc_file{                                                                                                                                 
+struct proc_file{
     struct file_operations fop;
     unsigned int mode;
-    char *name; 
+    char *name;
 };
 
 #define procify(propname) (&proc_##propname)
@@ -1375,7 +1375,7 @@ static int mhl_ic_exist_show_proc(struct file *file, char __user *page, size_t c
 {
 	unsigned char pin = 0;
     char *ptr = page;
-    
+
     if (*ppos)  // CMD call again
     {
         return 0;
@@ -1437,19 +1437,19 @@ const EXTD_DRIVER *EXTD_HDMI_Driver(void)
 
     if(has_init)
 		return &extd_driver_hdmi;
-	
-    mhl_ic_proc = proc_create(sproc_file[0]->name, 
+
+    mhl_ic_proc = proc_create(sproc_file[0]->name,
             sproc_file[0]->mode, NULL, &(sproc_file[0]->fop));
     if(!mhl_ic_proc)
     {
 		printk("hdmi_init: create proc file fail !\n");
     }
-		
+
 	mt_set_gpio_mode(GPIO52|0x80000000, GPIO_MODE_00);
 	mt_set_gpio_dir(GPIO52|0x80000000, GPIO_DIR_IN);
 	mt_set_gpio_pull_enable(GPIO52|0x80000000, GPIO_PULL_DISABLE);
 	//mt_set_gpio_pull_select(GPIO_CTP_EINT_PIN, GPIO_PULL_UP);
-	
+
     mhl_pin = mt_get_gpio_in(GPIO52|0x80000000);
 	if(mhl_pin){
 		printk("hdmi_init: mhl ic not exist, mhl pin=%d\n",mhl_pin);
@@ -1473,6 +1473,6 @@ const EXTD_DRIVER *EXTD_HDMI_Driver(void)
 
 	has_init++;
 #endif
-   
+
 	return &extd_driver_hdmi;
 }

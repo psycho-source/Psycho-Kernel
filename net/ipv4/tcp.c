@@ -3584,9 +3584,9 @@ int tcp_nuke_addr(struct net *net, struct sockaddr *addr)
 {
 	int family = addr->sa_family;
 	unsigned int bucket;
-	
+
 	/*mtk_net:debug log*/
-  int count = 0; 
+	int count = 0;
 	struct in_addr *in;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	struct in6_addr *in6 = NULL ;
@@ -3600,9 +3600,8 @@ int tcp_nuke_addr(struct net *net, struct sockaddr *addr)
 	} else {
 		return -EAFNOSUPPORT;
 	}
-		/*mtk_net:debug log*/
-  printk(KERN_INFO "[mtk_net][tcp]tcp_nuke_addr: tcp_hashinfo.ehash_mask = %d\n",tcp_hashinfo.ehash_mask);
-	for (bucket = 0; bucket < tcp_hashinfo.ehash_mask; bucket++) {
+
+	for (bucket = 0; bucket <= tcp_hashinfo.ehash_mask; bucket++) {
 		struct hlist_nulls_node *node;
 		struct sock *sk;
 		spinlock_t *lock = inet_ehash_lockp(&tcp_hashinfo, bucket);
@@ -3649,21 +3648,26 @@ restart:
 			spin_unlock_bh(lock);
 
 			lock_sock(sk);
-			// TODO:
-			// Check for SOCK_DEAD again, it could have changed.
-			// Add a write barrier, see tcp_reset().
 			local_bh_disable();
-			sk->sk_err = ETIMEDOUT;
-			sk->sk_error_report(sk);
+			bh_lock_sock(sk);
 			count++;
-            /*mtk_net: skip closed sk*/
+
+			/*mtk_net: skip closed sk*/
 			if(sk->sk_state != TCP_CLOSE && sk->sk_shutdown != SHUTDOWN_MASK)
 				{
 					printk(KERN_INFO "[mtk_net][tcp]skip ALPS01866438 Google Issue!\n");			 
 				}
-			tcp_done(sk);
-			release_sock(sk);
+
+			if (!sock_flag(sk, SOCK_DEAD)) {
+				smp_wmb();  /* be consistent with tcp_reset */
+				sk->sk_err = ETIMEDOUT;
+				sk->sk_error_report(sk);
+				tcp_done(sk);
+			}
+
+			bh_unlock_sock(sk);
 			local_bh_enable();
+			release_sock(sk);
 			sock_put(sk);
 
 			goto restart;

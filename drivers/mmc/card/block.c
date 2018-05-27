@@ -44,10 +44,6 @@
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/sd.h>
 
-#ifdef CONFIG_MMC_FFU
-#include <linux/mmc/ffu.h>
-#endif
-
 #include <asm/uaccess.h>
 
 #include "queue.h"
@@ -559,6 +555,8 @@ static ssize_t power_ro_lock_show(struct device *dev,
 
 	ret = snprintf(buf, PAGE_SIZE, "%d\n", locked);
 
+	mmc_blk_put(md);
+
 	return ret;
 }
 
@@ -639,6 +637,250 @@ out:
 	mmc_blk_put(md);
 	return ret;
 }
+
+#ifdef CONFIG_MMC_SIMULATE_MAX_SPEED
+
+static int max_read_speed, max_write_speed, cache_size = 4;
+
+module_param(max_read_speed, int, S_IRUSR | S_IRGRP);
+MODULE_PARM_DESC(max_read_speed, "maximum KB/s read speed 0=off");
+module_param(max_write_speed, int, S_IRUSR | S_IRGRP);
+MODULE_PARM_DESC(max_write_speed, "maximum KB/s write speed 0=off");
+module_param(cache_size, int, S_IRUSR | S_IRGRP);
+MODULE_PARM_DESC(cache_size, "MB high speed memory or SLC cache");
+
+/*
+ * helper macros and expectations:
+ *  size    - unsigned long number of bytes
+ *  jiffies - unsigned long HZ timestamp difference
+ *  speed   - unsigned KB/s transfer rate
+ */
+#define size_and_speed_to_jiffies(size, speed) \
+		((size) * HZ / (speed) / 1024UL)
+#define jiffies_and_speed_to_size(jiffies, speed) \
+		(((speed) * (jiffies) * 1024UL) / HZ)
+#define jiffies_and_size_to_speed(jiffies, size) \
+		((size) * HZ / (jiffies) / 1024UL)
+
+/* Limits to report warning */
+/* jiffies_and_size_to_speed(10*HZ, queue_max_hw_sectors(q) * 512UL) ~ 25 */
+#define MIN_SPEED(q) 250 /* 10 times faster than a floppy disk */
+#define MAX_SPEED(q) jiffies_and_size_to_speed(1, queue_max_sectors(q) * 512UL)
+
+#define speed_valid(speed) ((speed) > 0)
+
+static const char off[] = "off\n";
+
+static int max_speed_show(int speed, char *buf)
+{
+	if (speed)
+		return scnprintf(buf, PAGE_SIZE, "%uKB/s\n", speed);
+	else
+		return scnprintf(buf, PAGE_SIZE, off);
+}
+
+static int max_speed_store(const char *buf, struct request_queue *q)
+{
+	unsigned int limit, set = 0;
+
+	if (!strncasecmp(off, buf, sizeof(off) - 2))
+		return set;
+	if (kstrtouint(buf, 0, &set) || (set > INT_MAX))
+		return -EINVAL;
+	if (set == 0)
+		return set;
+	limit = MAX_SPEED(q);
+	if (set > limit)
+		pr_warn("max speed %u ineffective above %u\n", set, limit);
+	limit = MIN_SPEED(q);
+	if (set < limit)
+		pr_warn("max speed %u painful below %u\n", set, limit);
+	return set;
+}
+
+static ssize_t max_write_speed_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	struct mmc_blk_data *md = mmc_blk_get(dev_to_disk(dev));
+	int ret = max_speed_show(atomic_read(&md->queue.max_write_speed), buf);
+
+	mmc_blk_put(md);
+	return ret;
+}
+
+static ssize_t max_write_speed_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct mmc_blk_data *md = mmc_blk_get(dev_to_disk(dev));
+	int set = max_speed_store(buf, md->queue.queue);
+
+	if (set < 0) {
+		mmc_blk_put(md);
+		return set;
+	}
+
+	atomic_set(&md->queue.max_write_speed, set);
+	mmc_blk_put(md);
+	return count;
+}
+
+static const DEVICE_ATTR(max_write_speed, S_IRUGO | S_IWUSR,
+	max_write_speed_show, max_write_speed_store);
+
+static ssize_t max_read_speed_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	struct mmc_blk_data *md = mmc_blk_get(dev_to_disk(dev));
+	int ret = max_speed_show(atomic_read(&md->queue.max_read_speed), buf);
+
+	mmc_blk_put(md);
+	return ret;
+}
+
+static ssize_t max_read_speed_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct mmc_blk_data *md = mmc_blk_get(dev_to_disk(dev));
+	int set = max_speed_store(buf, md->queue.queue);
+
+	if (set < 0) {
+		mmc_blk_put(md);
+		return set;
+	}
+
+	atomic_set(&md->queue.max_read_speed, set);
+	mmc_blk_put(md);
+	return count;
+}
+
+static const DEVICE_ATTR(max_read_speed, S_IRUGO | S_IWUSR,
+	max_read_speed_show, max_read_speed_store);
+
+static ssize_t cache_size_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct mmc_blk_data *md = mmc_blk_get(dev_to_disk(dev));
+	struct mmc_queue *mq = &md->queue;
+	int cache_size = atomic_read(&mq->cache_size);
+	int ret;
+
+	if (!cache_size)
+		ret = scnprintf(buf, PAGE_SIZE, off);
+	else {
+		int speed = atomic_read(&mq->max_write_speed);
+
+		if (!speed_valid(speed))
+			ret = scnprintf(buf, PAGE_SIZE, "%uMB\n", cache_size);
+		else { /* We accept race between cache_jiffies and cache_used */
+			unsigned long size = jiffies_and_speed_to_size(
+				jiffies - mq->cache_jiffies, speed);
+			long used = atomic_long_read(&mq->cache_used);
+
+			if (size >= used)
+				size = 0;
+			else
+				size = (used - size) * 100 / cache_size
+					/ 1024UL / 1024UL;
+
+			ret = scnprintf(buf, PAGE_SIZE, "%uMB %lu%% used\n",
+				cache_size, size);
+		}
+	}
+
+	mmc_blk_put(md);
+	return ret;
+}
+
+static ssize_t cache_size_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct mmc_blk_data *md;
+	unsigned int set = 0;
+
+	if (strncasecmp(off, buf, sizeof(off) - 2)
+	 && (kstrtouint(buf, 0, &set) || (set > INT_MAX)))
+		return -EINVAL;
+
+	md = mmc_blk_get(dev_to_disk(dev));
+	atomic_set(&md->queue.cache_size, set);
+	mmc_blk_put(md);
+	return count;
+}
+
+static const DEVICE_ATTR(cache_size, S_IRUGO | S_IWUSR,
+	cache_size_show, cache_size_store);
+
+/* correct for write-back */
+static long mmc_blk_cache_used(struct mmc_queue *mq, unsigned long waitfor)
+{
+	long used = 0;
+	int speed = atomic_read(&mq->max_write_speed);
+
+	if (speed_valid(speed)) {
+		unsigned long size = jiffies_and_speed_to_size(
+					waitfor - mq->cache_jiffies, speed);
+		used = atomic_long_read(&mq->cache_used);
+
+		if (size >= used)
+			used = 0;
+		else
+			used -= size;
+	}
+
+	atomic_long_set(&mq->cache_used, used);
+	mq->cache_jiffies = waitfor;
+
+	return used;
+}
+
+static void mmc_blk_simulate_delay(
+	struct mmc_queue *mq,
+	struct request *req,
+	unsigned long waitfor)
+{
+	int max_speed;
+
+	if (!req)
+		return;
+
+	max_speed = (rq_data_dir(req) == READ)
+		? atomic_read(&mq->max_read_speed)
+		: atomic_read(&mq->max_write_speed);
+	if (speed_valid(max_speed)) {
+		unsigned long bytes = blk_rq_bytes(req);
+
+		if (rq_data_dir(req) != READ) {
+			int cache_size = atomic_read(&mq->cache_size);
+
+			if (cache_size) {
+				unsigned long size = cache_size * 1024L * 1024L;
+				long used = mmc_blk_cache_used(mq, waitfor);
+
+				used += bytes;
+				atomic_long_set(&mq->cache_used, used);
+				bytes = 0;
+				if (used > size)
+					bytes = used - size;
+			}
+		}
+		waitfor += size_and_speed_to_jiffies(bytes, max_speed);
+		if (time_is_after_jiffies(waitfor)) {
+			long msecs = jiffies_to_msecs(waitfor - jiffies);
+
+			if (likely(msecs > 0))
+				msleep(msecs);
+		}
+	}
+}
+
+#else
+
+#define mmc_blk_simulate_delay(mq, req, waitfor)
+
+#endif
 
 static int mmc_blk_open(struct block_device *bdev, fmode_t mode)
 {
@@ -764,137 +1006,6 @@ static int ioctl_rpmb_card_status_poll(struct mmc_card *card, u32 *status,
 
 	return err;
 }
-
-#ifdef CONFIG_MMC_FFU
-/* This function is modified by from mmc_blk_ioctl() */
-static int mmc_ffu_ioctl(struct block_device *bdev,
-	struct mmc_ioc_cmd __user *ic_ptr)
-{
-	struct mmc_blk_ioc_data *idata;
-	struct mmc_blk_data *md;
-	struct mmc_card *card;
-	struct mmc_command cmd = {0};
-	struct mmc_data data = {0};
-	struct mmc_request mrq = {NULL};
-	struct scatterlist sg;
-	int err=0;
-
-	idata = mmc_ffu_ioctl_copy_from_user(ic_ptr);
-	if (IS_ERR(idata))
-		return PTR_ERR(idata);
-
-	md = mmc_blk_get(bdev->bd_disk);
-	if (!md) {
-		err = -EINVAL;
-		goto cmd_err;
-	}
-
-	card = md->queue.card;
-	if (IS_ERR(card)) {
-		err = PTR_ERR(card);
-		goto cmd_done;
-	}
-
-	cmd.opcode = idata->ic.opcode;
-	cmd.arg = idata->ic.arg;
-	cmd.flags = idata->ic.flags;
-
-	if (idata->buf_bytes) {
-		data.sg = &sg;
-		data.sg_len = 1;
-		data.blksz = idata->ic.blksz;
-		data.blocks = idata->ic.blocks;
-
-		sg_init_one(data.sg, idata->buf, idata->buf_bytes);
-
-		if (idata->ic.write_flag)
-			data.flags = MMC_DATA_WRITE;
-		else
-			data.flags = MMC_DATA_READ;
-
-		/* data.flags must already be set before doing this. */
-		mmc_set_data_timeout(&data, card);
-
-		/* Allow overriding the timeout_ns for empirical tuning. */
-		if (idata->ic.data_timeout_ns)
-			data.timeout_ns = idata->ic.data_timeout_ns;
-
-		if ((cmd.flags & MMC_RSP_R1B) == MMC_RSP_R1B) {
-			/*
-			 * Pretend this is a data transfer and rely on the
-			 * host driver to compute timeout.  When all host
-			 * drivers support cmd.cmd_timeout for R1B, this
-			 * can be changed to:
-			 *
-			 *     mrq.data = NULL;
-			 *     cmd.cmd_timeout = idata->ic.cmd_timeout_ms;
-			 */
-			data.timeout_ns = idata->ic.cmd_timeout_ms * 1000000;
-		}
-
-		mrq.data = &data;
-	}
-
-	mrq.cmd = &cmd;
-
-	mmc_claim_host(card->host);
-
-	if (cmd.opcode == MMC_FFU_DOWNLOAD_OP) {
-		pr_err("FFU Download start\n");
-		err = mmc_ffu_download(card, &cmd , idata->buf,
-			idata->buf_bytes);
-
-		if ( err ) {
-			pr_err("FFU: %s: error %d FFU download:\n",
-				mmc_hostname(card->host), err);
-		}
-
-	}
-
-	if (cmd.opcode == MMC_SEND_EXT_CSD ) {
-
-		mmc_wait_for_req(card->host, &mrq);
-
-		if (cmd.error) {
-			dev_err(mmc_dev(card->host), "%s: cmd error %d\n",
-				__func__, cmd.error);
-			err = cmd.error;
-			goto cmd_rel_host;
-		}
-		if (data.error) {
-			dev_err(mmc_dev(card->host), "%s: data error %d\n",
-				__func__, data.error);
-			err = data.error;
-			goto cmd_rel_host;
-		}
-
-		if (copy_to_user(&(ic_ptr->response), cmd.resp, sizeof(cmd.resp))) {
-			err = -EFAULT;
-			goto cmd_rel_host;
-		}
-
-		if (!idata->ic.write_flag) {
-			if (copy_to_user((void __user *)(unsigned long) idata->ic.data_ptr,
-				idata->buf, idata->buf_bytes)) {
-				err = -EFAULT;
-				goto cmd_rel_host;
-			}
-		}
-
-	}
-
-cmd_rel_host:
-	mmc_release_host(card->host);
-
-cmd_done:
-	mmc_blk_put(md);
-cmd_err:
-	kfree(idata->buf);
-	kfree(idata);
-	return err;
-
-}
-#endif
 
 static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 	struct mmc_ioc_cmd __user *ic_ptr)
@@ -1062,10 +1173,6 @@ static int mmc_blk_ioctl(struct block_device *bdev, fmode_t mode,
 	int ret = -EINVAL;
 	if (cmd == MMC_IOC_CMD)
 		ret = mmc_blk_ioctl_cmd(bdev, (struct mmc_ioc_cmd __user *)arg);
-#ifdef CONFIG_MMC_FFU
-	else if (cmd == MMC_IOC_FFU_CMD)
-		ret = mmc_ffu_ioctl(bdev, (struct mmc_ioc_cmd __user *)arg);
-#endif
 	return ret;
 }
 
@@ -1560,6 +1667,23 @@ static int mmc_blk_issue_flush(struct mmc_queue *mq, struct request *req)
 	if (ret)
 		ret = -EIO;
 
+#ifdef CONFIG_MMC_SIMULATE_MAX_SPEED
+	else if (atomic_read(&mq->cache_size)) {
+		long used = mmc_blk_cache_used(mq, jiffies);
+
+		if (used) {
+			int speed = atomic_read(&mq->max_write_speed);
+
+			if (speed_valid(speed)) {
+				unsigned long msecs = jiffies_to_msecs(
+					size_and_speed_to_jiffies(
+						used, speed));
+				if (msecs)
+					msleep(msecs);
+			}
+		}
+	}
+#endif
 	blk_end_request_all(req, ret);
 
 	return ret ? 0 : 1;
@@ -2282,190 +2406,7 @@ static void mmc_blk_revert_packed_req(struct mmc_queue *mq,
 
 	mmc_blk_clear_packed(mq_rq);
 }
-#if defined(FEATURE_STORAGE_PERF_INDEX)
-#define PRT_TIME_PERIOD	1000000000
-#define UP_LIMITS_4BYTE		4294967295UL	//((4*1024*1024*1024)-1)
-#define ID_CNT 10
-pid_t mmcqd[ID_CNT]={0};
-bool start_async_req[ID_CNT] = {0};
-unsigned long long start_async_req_time[ID_CNT] = {0};
-static unsigned long long mmcqd_tag_t1[ID_CNT]={0}, mmccid_tag_t1=0;
-unsigned long long mmcqd_t_usage_wr[ID_CNT]={0}, mmcqd_t_usage_rd[ID_CNT]={0};
-unsigned int mmcqd_rq_size_wr[ID_CNT]={0}, mmcqd_rq_size_rd[ID_CNT]={0};
-static unsigned int mmcqd_wr_offset_tag[ID_CNT]={0}, mmcqd_rd_offset_tag[ID_CNT]={0}, mmcqd_wr_offset[ID_CNT]={0}, mmcqd_rd_offset[ID_CNT]={0};
-static unsigned int mmcqd_wr_bit[ID_CNT]={0},mmcqd_wr_tract[ID_CNT]={0};
-static unsigned int mmcqd_rd_bit[ID_CNT]={0},mmcqd_rd_tract[ID_CNT]={0};
-static unsigned int mmcqd_wr_break[ID_CNT]={0}, mmcqd_rd_break[ID_CNT]={0};
-unsigned int mmcqd_rq_count[ID_CNT]={0}, mmcqd_wr_rq_count[ID_CNT]={0}, mmcqd_rd_rq_count[ID_CNT]={0};
-#ifdef FEATURE_STORAGE_META_LOG
-int check_perdev_minors = CONFIG_MMC_BLOCK_MINORS;
-struct metadata_rwlogger metadata_logger[10] = {{{0}}};
-#endif
 
-unsigned int mmcqd_work_percent[ID_CNT]={0};
-unsigned int mmcqd_w_throughput[ID_CNT]={0};
-unsigned int mmcqd_r_throughput[ID_CNT]={0};
-unsigned int mmcqd_read_clear[ID_CNT]={0};
-char block_io_log_dst_buffer[BLOCK_IO_BUFFER_SIZE] = {0};
-char block_io_log_source_buffer[PID_LOG_LENGTH] = {0};
-struct struct_block_io_ring {
-	char block_io_log_debugfs[BLOCK_IO_BUFFER_SIZE];
-};
-#define MAX_BLOCK_IO_LOG_COUNT 120
-struct struct_block_io_ring block_io_ring[MAX_BLOCK_IO_LOG_COUNT] = { { { 0 } } };
-int block_io_ring_index = 0;
-int stopringlog = 0;
-static void g_var_clear(unsigned int idx)
-{
-				mmcqd_t_usage_wr[idx] = 0;
-				mmcqd_t_usage_rd[idx] = 0;
-				mmcqd_rq_size_wr[idx] = 0;
-				mmcqd_rq_size_rd[idx] = 0;
-				mmcqd_rq_count[idx] = 0;
-				mmcqd_wr_offset[idx] = 0;
-				mmcqd_rd_offset[idx] = 0;
-				mmcqd_wr_break[idx] = 0;
-				mmcqd_rd_break[idx] = 0;
-				mmcqd_wr_tract[idx] = 0;
-				mmcqd_wr_bit[idx] = 0;
-				mmcqd_rd_tract[idx] = 0;
-				mmcqd_rd_bit[idx] = 0;
-				mmcqd_wr_rq_count[idx] = 0;
-				mmcqd_rd_rq_count[idx] = 0;
-}
-
-unsigned int find_mmcqd_index(void)
-{
-	pid_t mmcqd_pid=0;
-	unsigned int idx=0;
-	unsigned char i=0;
-
-	mmcqd_pid = task_pid_nr(current);
-
-	if(mmcqd[0] ==0) {
-		mmcqd[0] = mmcqd_pid;
-		start_async_req[0]=0;
-    }
-
-	for(i=0;i<ID_CNT;i++)
-	{
-		if(mmcqd_pid == mmcqd[i])
-		{
-			idx=i;
-			break;
-		}
-		if ((mmcqd[i] == 0) ||( i==ID_CNT-1))
-		{
-			mmcqd[i]=mmcqd_pid;
-			start_async_req[i]=0;
-			idx=i;
-			break;
-		}
-	}
-	return idx;
-}
-
-#endif
-//#undef FEATURE_STORAGE_PID_LOGGER
-#if defined(FEATURE_STORAGE_PID_LOGGER)
-
-struct struct_pid_logger g_pid_logger[PID_ID_CNT]={{0,0,{0},{0},{0},{0}}};
-
-
-
-unsigned char *page_logger = NULL;
-spinlock_t g_locker;
-struct dentry *blockio_dbgfs = NULL;
-static unsigned long long get_current_time_us(void)
-{
-	unsigned long long time = sched_clock();
-	/* return do_div(time,1000); */
-	return time;
-}
-
-
-static int block_io_debug_open(struct inode *inode, struct file *file)
-{
-	file->private_data = inode->i_private;
-	return 0;
-}
-static ssize_t block_io_debug_read(struct file *file, char __user *ubuf, size_t count, loff_t *ppos)
-{
-	size_t count1 = 0;
-	int index = 0;
-	int i = 0;
-	char *debug_fs = NULL;
-	struct struct_block_io_ring *tmp_logger;
-	stopringlog = 1;
-	index = block_io_ring_index;
-
-	debug_fs = vmalloc(MAX_BLOCK_IO_LOG_COUNT * sizeof(struct struct_block_io_ring));
-	if (debug_fs)
-		memset(debug_fs, 0 , MAX_BLOCK_IO_LOG_COUNT * sizeof(struct struct_block_io_ring));
-	for (i = 0; i < MAX_BLOCK_IO_LOG_COUNT; i++) {
-		tmp_logger = ((struct struct_block_io_ring *)debug_fs) + i;
-		snprintf((tmp_logger->block_io_log_debugfs), BLOCK_IO_BUFFER_SIZE,
-			block_io_ring[(index + i)%MAX_BLOCK_IO_LOG_COUNT].block_io_log_debugfs);
-	}
-	count1 = simple_read_from_buffer(ubuf, count, ppos, debug_fs,
-		sizeof(struct struct_block_io_ring) * MAX_BLOCK_IO_LOG_COUNT);
-	vfree(debug_fs);
-	stopringlog = 0;
-	return count1;
-}
-static ssize_t block_io_debug_write(struct file *file, const char __user *ubuf, size_t count, loff_t *ppos)
-{
-	return 0;
-}
-
-
-static const struct file_operations block_io_debug_fops = {
-	.read = block_io_debug_read,
-	.write = block_io_debug_write,
-	.open = block_io_debug_open,
-};
-void block_io_dbg_Init(void)
-{
-	blockio_dbgfs = debugfs_create_file("blockio", S_IFREG | S_IRUGO, NULL, (void *)0, &block_io_debug_fops);
-}
-void block_io_dbg_deinit(void)
-{
-	debugfs_remove(blockio_dbgfs);
-}
-
-static u64 get_idle_time(int cpu)
-{
-	u64 idle, idle_time = -1ULL;
-
-	if (cpu_online(cpu))
-		idle_time = get_cpu_idle_time_us(cpu, NULL);
-
-	if (idle_time == -1ULL)
-		/* !NO_HZ or cpu offline so we can rely on cpustat.idle */
-		idle = kcpustat_cpu(cpu).cpustat[CPUTIME_IDLE];
-	else
-		idle = usecs_to_cputime64(idle_time);
-
-	return idle;
-}
-
-static u64 get_iowait_time(int cpu)
-{
-	u64 iowait, iowait_time = -1ULL;
-
-	if (cpu_online(cpu))
-		iowait_time = get_cpu_iowait_time_us(cpu, NULL);
-
-	if (iowait_time == -1ULL)
-		/* !NO_HZ or cpu offline so we can rely on cpustat.iowait */
-		iowait = kcpustat_cpu(cpu).cpustat[CPUTIME_IOWAIT];
-	else
-		iowait = usecs_to_cputime64(iowait_time);
-
-	return iowait;
-}
-
-#endif
 static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 {
 	struct mmc_blk_data *md = mq->data;
@@ -2479,21 +2420,8 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 	const u8 packed_nr = 2;
 	u8 reqs = 0;
 	unsigned long long time1 = 0;
-#if defined(FEATURE_STORAGE_PERF_INDEX)
-	pid_t mmcqd_pid=0;
-	unsigned long long t_period=0, t_usage=0;
-	unsigned int t_percent=0;
-	unsigned int perf_meter = 0;
-	unsigned int rq_byte=0,rq_sector=0,sect_offset=0;
-	unsigned int diversity=0;
-	unsigned int idx=0;
-#endif
-#if defined(FEATURE_STORAGE_PID_LOGGER)
-	unsigned int index=0;
-	uint64_t time = 0;
-	unsigned long rem_nsec;
-	u64 user, nice, system, idle, iowait, irq, softirq;
-	int i;
+#ifdef CONFIG_MMC_SIMULATE_MAX_SPEED
+	unsigned long waitfor = jiffies;
 #endif
 
 	if (!rqc && !mq->mqrq_prev->req)
@@ -2502,225 +2430,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 
 	if (rqc)
 		reqs = mmc_blk_prep_packed_list(mq, rqc);
-#if defined(FEATURE_STORAGE_PERF_INDEX)
-			mmcqd_pid = task_pid_nr(current);
 
-			idx = find_mmcqd_index();
-
-			mmcqd_read_clear[idx] = 1;
-			if(mmccid_tag_t1==0)
-				mmccid_tag_t1 = time1;
-			t_period = time1 - mmccid_tag_t1;
-			if(t_period >= (unsigned long long )((PRT_TIME_PERIOD)*(unsigned long long )10))
-			{
-				mmccid_tag_t1 = time1;
-			}
-			if(mmcqd_tag_t1[idx]==0)
-				mmcqd_tag_t1[idx] = time1;
-			t_period = time1 - mmcqd_tag_t1[idx];
-
-			if(t_period >= (unsigned long long )PRT_TIME_PERIOD)
-			{
-				mmcqd_read_clear[idx] = 2;
-				mmcqd_work_percent[idx] = 1;
-				mmcqd_r_throughput[idx] = 0;
-				mmcqd_w_throughput[idx] = 0;
-				t_usage = mmcqd_t_usage_wr [idx] + mmcqd_t_usage_rd[idx];
-				if (t_period > t_usage*100) {
-					snprintf(block_io_log_source_buffer, WORKLOAD_LOG_LENGTH,
-						"wl:1%%,%lld,%lld,%d.", t_usage, t_period, mmcqd_rq_count[idx]);
-					strncat(block_io_log_dst_buffer, block_io_log_source_buffer,
-						WORKLOAD_LOG_LENGTH);
-				} else {
-					do_div(t_period, 100);	//boundary issue
-					t_percent = ((unsigned int)t_usage)/((unsigned int)t_period);
-					mmcqd_work_percent[idx] = t_percent;
-					snprintf(block_io_log_source_buffer, WORKLOAD_LOG_LENGTH,
-						"wl:%d%%,%lld,%lld,%d.", t_percent, t_usage,
-						t_period, mmcqd_rq_count[idx]);
-					strncat(block_io_log_dst_buffer, block_io_log_source_buffer,
-						WORKLOAD_LOG_LENGTH);
-				}
-				if(mmcqd_wr_rq_count[idx] >= 2)
-				{
-					diversity = mmcqd_wr_offset[idx]/(mmcqd_wr_rq_count[idx]-1);
-					snprintf(block_io_log_source_buffer , WRITE_DIVERSITY_LOG_LENGTH,
-						"wd:%d,%d,%d,%d,%d.", diversity, mmcqd_wr_rq_count[idx],
-						mmcqd_wr_break[idx], mmcqd_wr_tract[idx], mmcqd_wr_bit[idx]);
-					strncat(block_io_log_dst_buffer, block_io_log_source_buffer,
-						WRITE_DIVERSITY_LOG_LENGTH);
-
-				}
-				if(mmcqd_rd_rq_count[idx] >= 2)
-				{
-					diversity = mmcqd_rd_offset[idx]/(mmcqd_rd_rq_count[idx]-1);
-					snprintf(block_io_log_source_buffer, READ_DIVERSITY_LOG_LENGTH,
-						"rd:%d,%d,%d,%d,%d.", diversity, mmcqd_rd_rq_count[idx],
-						mmcqd_rd_break[idx], mmcqd_rd_tract[idx], mmcqd_rd_bit[idx]);
-					strncat(block_io_log_dst_buffer, block_io_log_source_buffer,
-						READ_DIVERSITY_LOG_LENGTH);
-				}
-				if(mmcqd_t_usage_wr[idx])
-				{
-					do_div(mmcqd_t_usage_wr[idx], 1000000);	//boundary issue
-					if(mmcqd_t_usage_wr[idx])	// discard print if duration will <1ms
-					{
-						perf_meter = (mmcqd_rq_size_wr[idx])/((unsigned int)mmcqd_t_usage_wr[idx]); //kb/s
-						mmcqd_w_throughput[idx] = perf_meter;
-						snprintf(block_io_log_source_buffer, WRITE_THROUGHPUT_LOG_LENGTH,
-							"wt:%d,%d,%lld.", perf_meter,
-							mmcqd_rq_size_wr[idx], mmcqd_t_usage_wr[idx]);
-						strncat(block_io_log_dst_buffer, block_io_log_source_buffer,
-							WRITE_THROUGHPUT_LOG_LENGTH);
-					}
-				}
-				if(mmcqd_t_usage_rd[idx])
-				{
-					do_div(mmcqd_t_usage_rd[idx], 1000000);	//boundary issue
-					if(mmcqd_t_usage_rd[idx])	// discard print if duration will <1ms
-					{
-						perf_meter =
-							(mmcqd_rq_size_rd[idx])/((unsigned int)mmcqd_t_usage_rd[idx]);
-						mmcqd_r_throughput[idx] = perf_meter;
-						snprintf(block_io_log_source_buffer, READ_THROUGHPUT_LOG_LENGTH,
-							"rt:%d,%d,%lld.", perf_meter,
-							mmcqd_rq_size_rd[idx], mmcqd_t_usage_rd[idx]);
-						strncat(block_io_log_dst_buffer, block_io_log_source_buffer,
-							READ_THROUGHPUT_LOG_LENGTH);
-					}
-				}
-				mmcqd_tag_t1[idx]=time1;
-				g_var_clear(idx);
-#if defined(FEATURE_STORAGE_VMSTAT_LOGGER)
-				snprintf(block_io_log_source_buffer, VMSTAT_LOG_LENGTH, "vm:%ld,%ld,%ld,%ld,%ld.",
-							((global_page_state(NR_FILE_PAGES)) << (PAGE_SHIFT - 10)),
-							((global_page_state(NR_FILE_DIRTY)) << (PAGE_SHIFT - 10)),
-							((global_page_state(NR_DIRTIED))    << (PAGE_SHIFT - 10)),
-							((global_page_state(NR_WRITEBACK))  << (PAGE_SHIFT - 10)),
-							((global_page_state(NR_WRITTEN))    << (PAGE_SHIFT - 10)));
-				strncat(block_io_log_dst_buffer, block_io_log_source_buffer, VMSTAT_LOG_LENGTH);
-
-#endif
-/*/proc/stat*/
-				user = nice = system = idle = iowait =
-				irq = softirq = 0;
-
-				for_each_possible_cpu(i) {
-					user += kcpustat_cpu(i).cpustat[CPUTIME_USER];
-					nice += kcpustat_cpu(i).cpustat[CPUTIME_NICE];
-					system += kcpustat_cpu(i).cpustat[CPUTIME_SYSTEM];
-					idle += get_idle_time(i);
-					iowait += get_iowait_time(i);
-					irq += kcpustat_cpu(i).cpustat[CPUTIME_IRQ];
-					softirq += kcpustat_cpu(i).cpustat[CPUTIME_SOFTIRQ];
-				}
-				snprintf(block_io_log_source_buffer, CPUSTAT_LOG_LENGTH,
-					"cpu:%llu,%llu,%llu,%llu,%llu,%llu,%llu.",
-							cputime64_to_clock_t(user),
-							cputime64_to_clock_t(nice),
-							cputime64_to_clock_t(system),
-							cputime64_to_clock_t(idle),
-							cputime64_to_clock_t(iowait),
-							cputime64_to_clock_t(irq),
-							cputime64_to_clock_t(softirq));
-				strncat(block_io_log_dst_buffer, block_io_log_source_buffer, CPUSTAT_LOG_LENGTH);
-/*/proc/stat end*/
-#if defined(FEATURE_STORAGE_PID_LOGGER)
-				do {
-					int i;
-					for(index=0; index<PID_ID_CNT; index++) {
-
-						if( g_pid_logger[index].current_pid!=0 && g_pid_logger[index].current_pid == mmcqd_pid)
-							break;
-					}
-					if( index == PID_ID_CNT )
-						break;
-					for( i=0; i<PID_LOGGER_COUNT; i++) {
-						if( g_pid_logger[index].pid_logger[i] == 0)
-							break;
-						sprintf(g_pid_logger[index].pid_buffer+i*37,
-							"{%05d:%05d:%08d:%05d:%08d}",
-							g_pid_logger[index].pid_logger[i],
-							g_pid_logger[index].pid_logger_counter[i],
-							g_pid_logger[index].pid_logger_length[i],
-							g_pid_logger[index].pid_logger_r_counter[i],
-							g_pid_logger[index].pid_logger_r_length[i]);
-
-					}
-					if( i != 0) {
-						snprintf(block_io_log_source_buffer, PID_LOG_LENGTH, "pid:%d,%s.",
-							g_pid_logger[index].current_pid,
-							g_pid_logger[index].pid_buffer);
-						strncat(block_io_log_dst_buffer, block_io_log_source_buffer,
-							PID_LOG_LENGTH);
-						memset( &(g_pid_logger[index].pid_logger), 0, sizeof(unsigned short)*PID_LOGGER_COUNT);
-						memset( &(g_pid_logger[index].pid_logger_counter), 0, sizeof(unsigned short)*PID_LOGGER_COUNT);
-						memset( &(g_pid_logger[index].pid_logger_length), 0, sizeof(unsigned int)*PID_LOGGER_COUNT);
-						memset( &(g_pid_logger[index].pid_logger_r_counter), 0, sizeof(unsigned short)*PID_LOGGER_COUNT);
-						memset( &(g_pid_logger[index].pid_logger_r_length), 0, sizeof(unsigned int)*PID_LOGGER_COUNT);
-						memset( &(g_pid_logger[index].pid_buffer), 0, sizeof(char)*PID_BUFFER_SIZE);
-#if defined(CONFIG_MTK_MORE_PID_LOGGER_COUNT)
-						g_pid_logger[index].reserved=0;
-#endif
-					}
-					g_pid_logger[index].pid_buffer[0] = '\0';
-
-				} while(0);
-#endif
-#if defined(FEATURE_STORAGE_PID_LOGGER)
-				pr_debug("[BLOCK_TAG] mmcqd:%d %s\n", mmcqd[idx], block_io_log_dst_buffer);
-			if (stopringlog == 0) {
-				memset(&(block_io_ring[block_io_ring_index].block_io_log_debugfs), 0,
-					sizeof(char)*BLOCK_IO_BUFFER_SIZE);
-			    time = get_current_time_us();
-				rem_nsec = do_div(time, 1000000000);
-				snprintf((block_io_ring[block_io_ring_index].block_io_log_debugfs),
-					BLOCK_IO_BUFFER_SIZE, "\n[%5lu.%06lu]q:%d.%s",
-					(unsigned long)time, rem_nsec / 1000, idx, block_io_log_dst_buffer);
-				block_io_ring_index++;
-				block_io_ring_index = block_io_ring_index%MAX_BLOCK_IO_LOG_COUNT;
-			}
-				memset(block_io_log_dst_buffer, 0, BLOCK_IO_BUFFER_SIZE);
-				memset(block_io_log_source_buffer, 0, PID_LOG_LENGTH);
-#endif
-
-			}
-		if( rqc )
-              {
-			rq_byte = blk_rq_bytes(rqc);
-			rq_sector = blk_rq_sectors(rqc);
-			if(rq_data_dir(rqc) == WRITE)
-			{
-				if(mmcqd_wr_offset_tag[idx]>0)
-				{
-					sect_offset = abs(blk_rq_pos(rqc) - mmcqd_wr_offset_tag[idx]);
-					mmcqd_wr_offset[idx] += sect_offset;
-					if(sect_offset == 1)
-						mmcqd_wr_break[idx]++;
-				}
-				mmcqd_wr_offset_tag[idx] = blk_rq_pos(rqc) + rq_sector;
-				if(rq_sector <= 1)	//512 bytes
-					mmcqd_wr_bit[idx] ++;
-				else if(rq_sector >= 1016)					//508kB
-					mmcqd_wr_tract[idx] ++;
-			}
-			else	//read
-			{
-				if(mmcqd_rd_offset_tag[idx]>0)
-				{
-					sect_offset = abs(blk_rq_pos(rqc) - mmcqd_rd_offset_tag[idx]);
-					mmcqd_rd_offset[idx] += sect_offset;
-					if(sect_offset == 1)
-						mmcqd_rd_break[idx]++;
-				}
-				mmcqd_rd_offset_tag[idx] = blk_rq_pos(rqc) + rq_sector;
-				if(rq_sector <= 1)	//512 bytes
-					mmcqd_rd_bit[idx] ++;
-				else if(rq_sector >= 1016)					//508kB
-					mmcqd_rd_tract[idx] ++;
-			}
-              }
-#endif
 	do {
 		if (rqc) {
 			/*
@@ -2764,6 +2474,8 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 			 */
 			mmc_blk_reset_success(md, type);
 
+			mmc_blk_simulate_delay(mq, rqc, waitfor);
+
 			if (mmc_packed_cmd(mq_rq->cmd_type)) {
 				ret = mmc_blk_end_packed_req(mq_rq);
 				break;
@@ -2790,9 +2502,11 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 			break;
 		case MMC_BLK_CMD_ERR:
 			ret = mmc_blk_cmd_err(md, card, brq, req, ret);
-			if (!mmc_blk_reset(md, card->host, type))
-				break;
-			goto cmd_abort;
+			if (mmc_blk_reset(md, card->host, type))
+				goto cmd_abort;
+			if (!ret)
+				goto start_new_req;
+			break;
 		case MMC_BLK_RETRY:
 			if (retry++ < 5)
 				break;
@@ -2971,9 +2685,6 @@ static inline int mmc_blk_readonly(struct mmc_card *card)
 	       !(card->csd.cmdclass & CCC_BLOCK_WRITE);
 }
 
-//#if defined(FEATURE_STORAGE_PID_LOGGER)
-//extern unsigned long get_memory_size(void);
-//#endif
 #ifdef CONFIG_MTK_EXTMEM
 extern void* extmem_malloc_page_align(size_t bytes);
 #endif
@@ -3032,28 +2743,6 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 	ret = mmc_init_queue(&md->queue, card, &md->lock, subname);
 	if (ret)
 		goto err_putdisk;
-#if defined(FEATURE_STORAGE_PID_LOGGER)
-	if( !page_logger){
-		//num_page_logger = sizeof(struct page_pid_logger);
-		//page_logger = vmalloc(num_physpages*sizeof(struct page_pid_logger));
-                // solution: use get_memory_size to obtain the size from start pfn to max pfn
-
-                //unsigned long count = get_memory_size() >> PAGE_SHIFT;
-                unsigned long count = get_max_DRAM_size() >> PAGE_SHIFT;
-#ifdef CONFIG_MTK_EXTMEM
-		page_logger = extmem_malloc_page_align(count * sizeof(struct page_pid_logger));
-#else
-		page_logger = vmalloc(count * sizeof(struct page_pid_logger));
-#endif
-		if( page_logger) {
-			memset( page_logger, -1, count*sizeof( struct page_pid_logger));
-		}
-		spin_lock_init(&g_locker);
-	}
-#endif
-#if defined(FEATURE_STORAGE_META_LOG)
-	check_perdev_minors = perdev_minors;
-#endif
 
 	md->queue.issue_fn = mmc_blk_issue_rq;
 	md->queue.data = md;
@@ -3229,6 +2918,14 @@ static void mmc_blk_remove_req(struct mmc_blk_data *md)
 					card->ext_csd.boot_ro_lockable)
 				device_remove_file(disk_to_dev(md->disk),
 					&md->power_ro_lock);
+#ifdef CONFIG_MMC_SIMULATE_MAX_SPEED
+			device_remove_file(disk_to_dev(md->disk),
+						&dev_attr_max_write_speed);
+			device_remove_file(disk_to_dev(md->disk),
+						&dev_attr_max_read_speed);
+			device_remove_file(disk_to_dev(md->disk),
+						&dev_attr_cache_size);
+#endif
 
 			/* Stop new requests from getting into the queue */
 			del_gendisk(md->disk);
@@ -3270,6 +2967,24 @@ static int mmc_add_disk(struct mmc_blk_data *md)
 	ret = device_create_file(disk_to_dev(md->disk), &md->force_ro);
 	if (ret)
 		goto force_ro_fail;
+#ifdef CONFIG_MMC_SIMULATE_MAX_SPEED
+	atomic_set(&md->queue.max_write_speed, max_write_speed);
+	ret = device_create_file(disk_to_dev(md->disk),
+			&dev_attr_max_write_speed);
+	if (ret)
+		goto max_write_speed_fail;
+	atomic_set(&md->queue.max_read_speed, max_read_speed);
+	ret = device_create_file(disk_to_dev(md->disk),
+			&dev_attr_max_read_speed);
+	if (ret)
+		goto max_read_speed_fail;
+	atomic_set(&md->queue.cache_size, cache_size);
+	atomic_long_set(&md->queue.cache_used, 0);
+	md->queue.cache_jiffies = jiffies;
+	ret = device_create_file(disk_to_dev(md->disk), &dev_attr_cache_size);
+	if (ret)
+		goto cache_size_fail;
+#endif
 
 	if ((md->area_type & MMC_BLK_DATA_AREA_BOOT) &&
 	     card->ext_csd.boot_ro_lockable) {
@@ -3294,6 +3009,14 @@ static int mmc_add_disk(struct mmc_blk_data *md)
 	return ret;
 
 power_ro_lock_fail:
+#ifdef CONFIG_MMC_SIMULATE_MAX_SPEED
+	device_remove_file(disk_to_dev(md->disk), &dev_attr_cache_size);
+cache_size_fail:
+	device_remove_file(disk_to_dev(md->disk), &dev_attr_max_read_speed);
+max_read_speed_fail:
+	device_remove_file(disk_to_dev(md->disk), &dev_attr_max_write_speed);
+max_write_speed_fail:
+#endif
 	device_remove_file(disk_to_dev(md->disk), &md->force_ro);
 force_ro_fail:
 	del_gendisk(md->disk);
@@ -3459,8 +3182,7 @@ static void mmc_blk_remove(struct mmc_card *card)
 #endif
 }
 
-#ifdef CONFIG_PM
-static int mmc_blk_suspend(struct mmc_card *card)
+static int _mmc_blk_suspend(struct mmc_card *card)
 {
 	struct mmc_blk_data *part_md;
 	struct mmc_blk_data *md = mmc_get_drvdata(card);
@@ -3472,6 +3194,17 @@ static int mmc_blk_suspend(struct mmc_card *card)
 		}
 	}
 	return 0;
+}
+
+static void mmc_blk_shutdown(struct mmc_card *card)
+{
+	_mmc_blk_suspend(card);
+}
+
+#ifdef CONFIG_PM
+static int mmc_blk_suspend(struct mmc_card *card)
+{
+	return _mmc_blk_suspend(card);
 }
 
 static int mmc_blk_resume(struct mmc_card *card)
@@ -3505,6 +3238,7 @@ static struct mmc_driver mmc_driver = {
 	.remove		= mmc_blk_remove,
 	.suspend	= mmc_blk_suspend,
 	.resume		= mmc_blk_resume,
+	.shutdown	= mmc_blk_shutdown,
 };
 
 static int __init mmc_blk_init(void)
@@ -3523,9 +3257,6 @@ static int __init mmc_blk_init(void)
 	res = mmc_register_driver(&mmc_driver);
 	if (res)
 		goto out2;
-#if defined(FEATURE_STORAGE_PERF_INDEX)
-	block_io_dbg_Init();
-#endif
 
 	return 0;
  out2:
@@ -3538,9 +3269,6 @@ static void __exit mmc_blk_exit(void)
 {
 	mmc_unregister_driver(&mmc_driver);
 	unregister_blkdev(MMC_BLOCK_MAJOR, "mmc");
-#if defined(FEATURE_STORAGE_PERF_INDEX)
-	block_io_dbg_deinit();
-#endif
 }
 
 module_init(mmc_blk_init);

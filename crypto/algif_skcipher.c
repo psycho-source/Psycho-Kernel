@@ -706,9 +706,6 @@ static int skcipher_accept_parent_nokey(void *private, struct sock *sk)
 	struct crypto_ablkcipher *skcipher = tfm->skcipher;
 	unsigned int len = sizeof(*ctx) + crypto_ablkcipher_reqsize(skcipher);
 
-	if (!tfm->has_key)
-		return -ENOKEY;
-
 	ctx = sock_kmalloc(sk, len, GFP_KERNEL);
 	if (!ctx)
 		return -ENOMEM;

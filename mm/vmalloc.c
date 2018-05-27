@@ -28,6 +28,7 @@
 #include <linux/kmemleak.h>
 #include <linux/atomic.h>
 #include <linux/llist.h>
+#include <linux/sizes.h>
 #include <asm/uaccess.h>
 #include <asm/tlbflush.h>
 #include <asm/shmparam.h>
@@ -1547,7 +1548,7 @@ void vfree(const void *addr)
 	if (!addr)
 		return;
 	if (unlikely(in_interrupt())) {
-		struct vfree_deferred *p = this_cpu_ptr(&vfree_deferred);
+		struct vfree_deferred *p = &__get_cpu_var(vfree_deferred);
 		llist_add((struct llist_node *)addr, &p->list);
 		schedule_work(&p->wq);
 	} else

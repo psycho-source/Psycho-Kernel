@@ -98,42 +98,6 @@
 #include <mtlbprof/mtlbprof.h>
 #include <mtlbprof/mtlbprof_stat.h>
 
-#ifdef CONFIG_MT_PRIO_TRACER
-# include <linux/prio_tracer.h>
-#endif
-
-static atomic_t __su_instances;
-
-int su_instances(void)
-{
-	return atomic_read(&__su_instances);
-}
-
-bool su_running(void)
-{
-	return su_instances() > 0;
-}
-
-bool su_visible(void)
-{
-	kuid_t uid = current_uid();
-	if (su_running())
-		return true;
-	if (uid_eq(uid, GLOBAL_ROOT_UID) || uid_eq(uid, GLOBAL_SYSTEM_UID))
-		return true;
-	return false;
-}
-
-void su_exec(void)
-{
-	atomic_inc(&__su_instances);
-}
-
-void su_exit(void)
-{
-	atomic_dec(&__su_instances);
-}
-
 void start_bandwidth_timer(struct hrtimer *period_timer, ktime_t period)
 {
 	unsigned long delta;
@@ -2985,20 +2949,6 @@ unsigned long long task_sched_runtime(struct task_struct *p)
 	struct rq *rq;
 	u64 ns = 0;
 
-#if defined(CONFIG_64BIT) && defined(CONFIG_SMP)
- /*
-	* 64-bit doesn't need locks to atomically read a 64bit value.
-	* So we have a optimization chance when the task's delta_exec is 0.
-	* Reading ->on_cpu is racy, but this is ok.
-	*
-	* If we race with it leaving cpu, we'll take a lock. So we're correct.
-	* If we race with it entering cpu, unaccounted time is 0. This is
-	* indistinguishable from the read occurring a few cycles earlier.
-	*/
- if (!p->on_cpu)
- return p->se.sum_exec_runtime;
-#endif
-
 	rq = task_rq_lock(p, &flags);
 	ns = p->se.sum_exec_runtime + do_task_delta_exec(p, rq);
 	task_rq_unlock(rq, p, &flags);
@@ -3878,15 +3828,6 @@ bool try_wait_for_completion(struct completion *x)
 {
 	unsigned long flags;
 	int ret = 1;
-
-	/*
-	 * Since x->done will need to be locked only
-	 * in the non-blocking case, we check x->done
-	 * first without taking the lock so we can
-	 * return early in the blocking case.
-	 */
-	if (!ACCESS_ONCE(x->done))
-		return 0;
 
 	spin_lock_irqsave(&x->wait.lock, flags);
 	if (!x->done)
@@ -4976,7 +4917,6 @@ long __sched io_schedule_timeout(long timeout)
 	delayacct_blkio_end();
 	return ret;
 }
-EXPORT_SYMBOL(io_schedule_timeout);
 
 /**
  * sys_sched_get_priority_max - return maximum RT priority.

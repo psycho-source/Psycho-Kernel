@@ -250,6 +250,11 @@ static void lcm_mt8193_set_lvds_analog(void)
 static void lcm_mt8193_ckgen_power_on(void)
 {
     u32 u4Reg = 0;
+
+	u4Reg = MT8193_REG_READ(REG_PLL_GPANACFG2);
+    u4Reg |= (PLLGP_ANACFG2_PLLGP_BIAS_EN);
+    MT8193_REG_WRITE(REG_PLL_GPANACFG2, u4Reg);
+	UDELAY(200);
 	
 	u4Reg = MT8193_REG_READ(REG_PLL_GPANACFG0);
 	u4Reg |= RG_PLL1_EN;
@@ -496,6 +501,46 @@ static void lcm_get_params(LCM_PARAMS *params)
     params->dpi.io_driving_current = LCM_DRIVING_CURRENT_2MA;
 }
 
+unsigned int reg[21] =
+{
+	0x0800,0x0804,0x0808,0x080c,0x0810,0x0814,0x0818,0x081c,0x0820,0x082c,0x0830,
+	0x0834,0x0904,0x0908,0x090c,0x0910,0x0914,0x0918,0x091c,0x0920,0x0934
+};
+static void lcm_mt8193_dump_register(void)
+{
+	u32 u4Reg = 0;
+	u32 i;
+
+	for(i=0;i<21;i++)
+	{
+		u4Reg = MT8193_REG_READ(reg[i]);
+#ifdef BUILD_LK
+		printf("[LK/LCM] 8193 LVDS TX Setting read Reg[0x%X] = 0x%X \n", reg[i], u4Reg);
+#else
+		pr_debug("[LCM]8193 LVDS TX Setting read Reg[0x%X] = 0x%X	\n", reg[i], u4Reg);
+#endif
+	}
+
+for (i = 0x0400; i < 0x0524; i += 4)
+    {
+    u4Reg = MT8193_REG_READ(i);
+#ifdef BUILD_LK
+    printf("[LK/LCM] 8193 DGI0 Setting read Reg[0x%X] = 0x%X \n", i, u4Reg);
+#else
+	pr_debug("[LCM] 8193 DGI0 Setting read Reg[0x%X] = 0x%X \n", i, u4Reg);
+#endif
+ 	}
+
+for (i = 0x1000; i < 0x138c; i += 4)
+    {
+    u4Reg = MT8193_REG_READ(i);
+#ifdef BUILD_LK
+    printf("[LK/LCM] 8193 Clock Setting read Reg[0x%X] = 0x%X \n", i, u4Reg);
+#else
+	pr_debug("[LCM] 8193 Clock Setting read Reg[0x%X] = 0x%X \n", i, u4Reg);
+#endif
+  	}
+}
 
 static void lcm_init(void)
 {

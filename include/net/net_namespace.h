@@ -24,8 +24,6 @@
 #include <net/netns/conntrack.h>
 #endif
 #include <net/netns/xfrm.h>
-#include <linux/idr.h>
-#include <linux/skbuff.h>
 
 struct user_namespace;
 struct proc_dir_entry;
@@ -53,8 +51,6 @@ struct net {
 						 */
 #endif
 	spinlock_t		rules_mod_lock;
-
-	atomic64_t		cookie_gen;
 
 	struct list_head	list;		/* list of network namespaces */
 	struct list_head	cleanup_list;	/* namespaces on death row */

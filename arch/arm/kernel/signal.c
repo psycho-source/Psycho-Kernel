@@ -401,6 +401,7 @@ setup_return(struct pt_regs *regs, struct ksignal *ksig,
 #ifdef CONFIG_MMU
 		if (cpsr & MODE32_BIT) {
 			struct mm_struct *mm = current->mm;
+
 			/*
 			 * 32-bit code can use the signal return page
 			 * except when the MPU has protected the vectors
@@ -408,6 +409,7 @@ setup_return(struct pt_regs *regs, struct ksignal *ksig,
 			 */
 			retcode = mm->context.sigpage + signal_return_offset +
 				  (idx << 2) + thumb;
+
 		} else
 #endif
 		{
@@ -641,3 +643,4 @@ struct page *get_signal_page(void)
 
 	return page;
 }
+

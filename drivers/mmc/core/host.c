@@ -36,7 +36,6 @@
  */
 #define MMC_IDLE_FLUSH_TIME_MS 1500
 #endif
-#define cls_dev_to_mmc_host(d)	container_of(d, struct mmc_host, class_dev)
 
 static void mmc_host_classdev_release(struct device *dev)
 {
@@ -431,6 +430,8 @@ void mmc_of_parse(struct mmc_host *host)
 		host->caps |= MMC_CAP_POWER_OFF_CARD;
 	if (of_find_property(np, "cap-sdio-irq", &len))
 		host->caps |= MMC_CAP_SDIO_IRQ;
+	if (of_find_property(np, "full-pwr-cycle", &len))
+		host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
 	if (of_find_property(np, "keep-power-in-suspend", &len))
 		host->pm_caps |= MMC_PM_KEEP_POWER;
 	if (of_find_property(np, "enable-sdio-wakeup", &len))
@@ -484,12 +485,14 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 
 	spin_lock_init(&host->lock);
 	init_waitqueue_head(&host->wq);
+	host->wlock_name = kasprintf(GFP_KERNEL,
+			"%s_detect", mmc_hostname(host));
 #ifndef CONFIG_HAS_EARLYSUSPEND
 	wakeup_source_init(&host->detect_wake_lock,
-		kasprintf(GFP_KERNEL, "%s_detect", mmc_hostname(host)));
+			host->wlock_name);
 #else
 	wake_lock_init(&host->detect_wake_lock, WAKE_LOCK_SUSPEND,
-		kasprintf(GFP_KERNEL, "%s_detect", mmc_hostname(host)));
+			host->wlock_name);
 #endif
 	INIT_DELAYED_WORK(&host->detect, mmc_rescan);
 #ifdef MMC_ENABLED_EMPTY_QUEUE_FLUSH
@@ -547,6 +550,8 @@ int mmc_add_host(struct mmc_host *host)
 #endif
 	mmc_host_clk_sysfs_init(host);
 
+	mmc_latency_hist_sysfs_init(host);
+
 	mmc_start_host(host);
 	if (!(host->pm_flags & MMC_PM_IGNORE_PM_NOTIFY))
 		register_pm_notifier(&host->pm_notify);
@@ -600,7 +605,8 @@ void mmc_free_host(struct mmc_host *host)
 #else
 	wake_lock_destroy(&host->detect_wake_lock);
 #endif
-
+	kfree(host->wlock_name);
+	mmc_latency_hist_sysfs_exit(host);
 	put_device(&host->class_dev);
 }
 

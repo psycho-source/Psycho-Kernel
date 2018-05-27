@@ -76,10 +76,6 @@ extern int msdc_autok_apply_param(struct msdc_host *host, unsigned int vcore_uv)
 #include "mach/mtk_hibernate_dpm.h"
 #endif
 
-#ifdef CONFIG_MMC_FFU
-#include <linux/mmc/ffu.h>
-#endif
-
 /*#if 1*/
 #ifndef FPGA_PLATFORM
 #include <mach/mt_pm_ldo.h>
@@ -3566,7 +3562,7 @@ int msdc_get_cache_region(void)
 
 	if (host->mmc != NULL) {
 		mmc_claim_host(host->mmc);
-		if (!mmc_cache_ctrl(host->mmc, 1))
+		if (!mmc_flush_cache(host->mmc->card))
 			pr_err("[%s]: cache_size=%dKB, cache_ctrl=%d\n", __func__,
 			       (host->mmc->card->ext_csd.cache_size / 8),
 			       host->mmc->card->ext_csd.cache_ctrl);
@@ -8923,11 +8919,6 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		msdc_clock_src[host->id] = MSDC_CLKSRC_200MHZ;
 	}
 
-#ifdef CONFIG_MMC_FFU
-	if ((state != MSDC_STATE_HS400) && (host->hw->host_function == MSDC_EMMC)) {
-		msdc_clock_src[host->id] = MSDC50_CLKSRC_200MHZ;
-	}
-#endif
 #else
 	if (ios->timing == MMC_TIMING_UHS_DDR50) {
 		state = MSDC_STATE_DDR;
@@ -9168,12 +9159,6 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 				msdc_apply_ett_settings(host, MSDC_HS200_MODE);
 		}
 #ifdef CONFIG_EMMC_50_FEATURE
-#ifdef CONFIG_MMC_FFU
-		if ((host->hw->host_function == MSDC_EMMC) &&
-		    ((state == MSDC_STATE_DEFAULT) && (ios->clock <= 25000000))) {
-			emmc_clear_timing();
-		}
-#endif
 #endif
 
 		msdc_set_mclk(host, state, ios->clock);

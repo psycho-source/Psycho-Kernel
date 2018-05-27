@@ -27,7 +27,8 @@
 #endif
 
 #ifdef CONFIG_ZRAM
-#include <linux/zram_drv.h>
+#include <zram_drv.h>
+static struct zram *zram_devices;
 #endif
 
 /* for collecting ion total memory usage*/
@@ -364,8 +365,8 @@ static void mlog_meminfo(void)
 
 	mlock = P2K(global_page_state(NR_MLOCK));
 #if defined(CONFIG_ZRAM) & defined(CONFIG_ZSMALLOC)
-	zram = (zram_devices && zram_devices->init_done && zram_devices->meta) ?
-	    B2K(zs_get_total_size_bytes(zram_devices->meta->mem_pool)) : 0;
+	zram = (zram_devices && zram_devices->meta != NULL && zram_devices->meta) ?
+	    B2K(zs_get_total_pages(zram_devices->meta->mem_pool) << PAGE_SHIFT ) : 0;
 #else
 	zram = 0;
 #endif
@@ -725,7 +726,7 @@ int mlog_doread(char __user *buf, size_t len)
 			v = '\n';
 		}
 		/* MLOG_PRINTK("[mlog] %d: %s\n", strfmt_idx, strfmt_list[strfmt_idx]); */
-        size = snprintf(mlog_str, MLOG_STR_LEN, strfmt_list[strfmt_idx++], v);
+		size = sprintf(mlog_str, strfmt_list[strfmt_idx++], v);
 
 		if (strfmt_idx >= strfmt_len)
 			strfmt_idx = strfmt_proc;
@@ -755,7 +756,7 @@ static void mlog_timer_handler(unsigned long data)
 {
 	mlog(MLOG_TRIGGER_TIMER);
 
-	mod_timer(&mlog_timer, round_jiffies(jiffies + timer_intval));
+	mod_timer(&mlog_timer, jiffies + timer_intval);
 }
 
 static void mlog_init_logger(void)

@@ -3,11 +3,11 @@
 
 ## Features
 - Supports one Touch Kernel Profiles.
-- Change Profiles from Nougat Quick Settings Tile.
+- Change Profiles from Quick Settings Tile.
 - Kernel Version 3.10.108. (LATEST)
 - Supports F2FS.
 - Dynamic fsync added.
-- Supports Powersaving task allignment(Need to be enabled from Kernel Audiutor CPU tab).
+- Supports Powersaving task allignment.
 - Supports FastCharging by default. No need to configure anything additionally.
 - Ported ThunderPLug(Load based Hot plugging) for better battery and performance.
 - Vibration Intensity Controller via ThunderQuake.

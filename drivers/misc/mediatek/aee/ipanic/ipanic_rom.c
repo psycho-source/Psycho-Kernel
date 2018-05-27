@@ -184,7 +184,11 @@ static int ipanic_memory_buffer(void *data, unsigned char *buffer, size_t sz_buf
 
 static int ipanic_alog_buffer(void *data, unsigned char *buffer, size_t sz_buf)
 {
-	return -1;
+	int rc;
+	rc = panic_dump_android_log(buffer, sz_buf, (unsigned long)data);
+	if (rc < 0)
+		rc = -1;
+	return rc;
 }
 
 inline int ipanic_func_write(fn_next next, void *data, int off, int total, int encrypt)

@@ -1657,7 +1657,6 @@ no_page_table:
 		return ERR_PTR(-EFAULT);
 	return page;
 }
-EXPORT_SYMBOL_GPL(follow_page_mask);
 
 /**
  * __get_user_pages() - pin user pages in memory

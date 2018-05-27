@@ -3,9 +3,7 @@
 
 #include <linux/ioctl.h>
 #include <linux/rtc.h>
-#ifdef CONFIG_ARM64
 #include <mach/mt_typedefs.h>
-#endif
 
 typedef enum {
 	RTC_GPIO_USER_WIFI = 8,

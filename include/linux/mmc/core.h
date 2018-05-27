@@ -140,6 +140,8 @@ struct mmc_request {
 	struct completion	completion;
 	void			(*done)(struct mmc_request *);/* completion function */
 	struct mmc_host		*host;
+	ktime_t			io_start;
+	int			lat_hist_enabled;
 };
 
 struct mmc_card;
@@ -203,10 +205,6 @@ extern void mmc_start_flush(struct mmc_card *card);
 extern int mmc_stop_flush(struct mmc_card *card);
 extern void mmc_start_delayed_flush(struct mmc_card *card);
 extern void mmc_start_idle_time_flush(struct work_struct *work);
-#endif
-
-#if defined(CONFIG_MMC_FFU)
-extern int mmc_reinit_oldcard(struct mmc_host *host);
 #endif
 
 /**

@@ -156,15 +156,22 @@ static struct super_block *alloc_super(struct file_system_type *type, int flags)
 	static const struct super_operations default_op;
 
 	if (s) {
-		if (security_sb_alloc(s)) {
-			/*
-			 * We cannot call security_sb_free() without
-			 * security_sb_alloc() succeeding. So bail out manually
-			 */
-			kfree(s);
-			s = NULL;
-			goto out;
+		if (security_sb_alloc(s))
+			goto out_free_sb;
+
+#ifdef CONFIG_SMP
+		s->s_files = alloc_percpu(struct list_head);
+		if (!s->s_files)
+			goto err_out;
+		else {
+			int i;
+
+			for_each_possible_cpu(i)
+				INIT_LIST_HEAD(per_cpu_ptr(s->s_files, i));
 		}
+#else
+		INIT_LIST_HEAD(&s->s_files);
+#endif
 		if (init_sb_writers(s, type))
 			goto err_out;
 		s->s_flags = flags;
@@ -214,7 +221,12 @@ out:
 	return s;
 err_out:
 	security_sb_free(s);
+#ifdef CONFIG_SMP
+	if (s->s_files)
+		free_percpu(s->s_files);
+#endif
 	destroy_sb_writers(s);
+out_free_sb:
 	kfree(s);
 	s = NULL;
 	goto out;
@@ -228,6 +240,9 @@ err_out:
  */
 static inline void destroy_super(struct super_block *s)
 {
+#ifdef CONFIG_SMP
+	free_percpu(s->s_files);
+#endif
 	destroy_sb_writers(s);
 	security_sb_free(s);
 	WARN_ON(!list_empty(&s->s_mounts));
@@ -397,6 +412,11 @@ void generic_shutdown_super(struct super_block *sb)
 		fsnotify_unmount_inodes(&sb->s_inodes);
 
 		evict_inodes(sb);
+
+		if (sb->s_dio_done_wq) {
+			destroy_workqueue(sb->s_dio_done_wq);
+			sb->s_dio_done_wq = NULL;
+		}
 
 		if (sop->put_super)
 			sop->put_super(sb);
@@ -710,8 +730,7 @@ int do_remount_sb2(struct vfsmount *mnt, struct super_block *sb, int flags, void
 	   make sure there are no rw files opened */
 	if (remount_ro) {
 		if (force) {
-			sb->s_readonly_remount = 1;
-			smp_wmb();
+			mark_files_ro(sb);
 		} else {
 			retval = sb_prepare_remount_readonly(sb);
 			if (retval)
@@ -770,7 +789,7 @@ static void do_emergency_remount(struct work_struct *work)
 	struct super_block *sb, *p = NULL;
 
 	spin_lock(&sb_lock);
-	list_for_each_entry(sb, &super_blocks, s_list) {
+	list_for_each_entry_reverse(sb, &super_blocks, s_list) {
 		if (hlist_unhashed(&sb->s_instances))
 			continue;
 		sb->s_count++;

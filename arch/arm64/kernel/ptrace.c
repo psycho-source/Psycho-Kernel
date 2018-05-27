@@ -251,6 +251,7 @@ static int ptrace_hbp_fill_attr_ctrl(unsigned int note_type,
 
 	attr->bp_len	= len;
 	attr->bp_type	= type;
+	attr->disabled	= disabled;
 	attr->bp_addr	+= offset;
 
 	return 0;
@@ -564,32 +565,6 @@ static int tls_set(struct task_struct *target, const struct user_regset *regset,
 	return ret;
 }
 
-static int system_call_get(struct task_struct *target,
-			   const struct user_regset *regset,
-			   unsigned int pos, unsigned int count,
-			   void *kbuf, void __user *ubuf)
-{
-	int syscallno = task_pt_regs(target)->syscallno;
-
-	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-				   &syscallno, 0, -1);
-}
-
-static int system_call_set(struct task_struct *target,
-			   const struct user_regset *regset,
-			   unsigned int pos, unsigned int count,
-			   const void *kbuf, const void __user *ubuf)
-{
-	int syscallno, ret;
-
-	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &syscallno, 0, -1);
-	if (ret)
-		return ret;
-
-	task_pt_regs(target)->syscallno = syscallno;
-	return ret;
-}
-
 enum aarch64_regset {
 	REGSET_GPR,
 	REGSET_FPR,
@@ -598,7 +573,6 @@ enum aarch64_regset {
 	REGSET_HW_BREAK,
 	REGSET_HW_WATCH,
 #endif
-	REGSET_SYSTEM_CALL,
 };
 
 static const struct user_regset aarch64_regsets[] = {
@@ -648,14 +622,6 @@ static const struct user_regset aarch64_regsets[] = {
 		.set = hw_break_set,
 	},
 #endif
-	[REGSET_SYSTEM_CALL] = {
-		.core_note_type = NT_ARM_SYSTEM_CALL,
-		.n = 1,
-		.size = sizeof(int),
-		.align = sizeof(int),
-		.get = system_call_get,
-		.set = system_call_set,
-	},
 };
 
 static const struct user_regset_view user_aarch64_view = {
@@ -690,35 +656,33 @@ static int compat_gpr_get(struct task_struct *target,
 
 	for (i = 0; i < num_regs; ++i) {
 		unsigned int idx = start + i;
-		void *reg;
+		compat_ulong_t reg;
 
 		switch (idx) {
 		case 15:
-			reg = (void *)&task_pt_regs(target)->pc;
+			reg = task_pt_regs(target)->pc;
 			break;
 		case 16:
-			reg = (void *)&task_pt_regs(target)->pstate;
+			reg = task_pt_regs(target)->pstate;
 			break;
 		case 17:
-			reg = (void *)&task_pt_regs(target)->orig_x0;
+			reg = task_pt_regs(target)->orig_x0;
 			break;
 		default:
-			reg = (void *)&task_pt_regs(target)->regs[idx];
+			reg = task_pt_regs(target)->regs[idx];
 		}
 
-		if (!ubuf && kbuf) {
-			if (i == 0 && NULL != target && target->pid == current->pid)
-				printk(KERN_WARNING "coredump(%d) copy registers to kbuf\n", current->pid);
-			memcpy(kbuf, reg, sizeof(compat_ulong_t));
-			kbuf += sizeof(compat_ulong_t);
-		}
-		else {
-			ret = copy_to_user(ubuf, reg, sizeof(compat_ulong_t));
-
-			if (ret)
+		if (kbuf) {
+			memcpy(kbuf, &reg, sizeof(reg));
+			kbuf += sizeof(reg);
+		} else {
+			ret = copy_to_user(ubuf, &reg, sizeof(reg));
+			if (ret) {
+				ret = -EFAULT;
 				break;
-			else
-				ubuf += sizeof(compat_ulong_t);
+			}
+
+			ubuf += sizeof(reg);
 		}
 	}
 
@@ -747,28 +711,35 @@ static int compat_gpr_set(struct task_struct *target,
 
 	for (i = 0; i < num_regs; ++i) {
 		unsigned int idx = start + i;
-		void *reg;
+		compat_ulong_t reg;
+
+		if (kbuf) {
+			memcpy(&reg, kbuf, sizeof(reg));
+			kbuf += sizeof(reg);
+		} else {
+			ret = copy_from_user(&reg, ubuf, sizeof(reg));
+			if (ret) {
+				ret = -EFAULT;
+				break;
+			}
+
+			ubuf += sizeof(reg);
+		}
 
 		switch (idx) {
 		case 15:
-			reg = (void *)&newregs.pc;
+			newregs.pc = reg;
 			break;
 		case 16:
-			reg = (void *)&newregs.pstate;
+			newregs.pstate = reg;
 			break;
 		case 17:
-			reg = (void *)&newregs.orig_x0;
+			newregs.orig_x0 = reg;
 			break;
 		default:
-			reg = (void *)&newregs.regs[idx];
+			newregs.regs[idx] = reg;
 		}
 
-		ret = copy_from_user(reg, ubuf, sizeof(compat_ulong_t));
-
-		if (ret)
-			goto out;
-		else
-			ubuf += sizeof(compat_ulong_t);
 	}
 
 	if (valid_user_regs(&newregs.user_regs))
@@ -776,7 +747,6 @@ static int compat_gpr_set(struct task_struct *target,
 	else
 		ret = -EINVAL;
 
-out:
 	return ret;
 }
 

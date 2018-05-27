@@ -198,6 +198,7 @@ struct inet6_dev {
 	struct ipv6_devconf	cnf;
 	struct ipv6_devstat	stats;
 
+	__s32			rs_interval;	/* in jiffies */
 	struct timer_list	rs_timer;
 	__u8			rs_probes;
 
