@@ -1,7 +1,11 @@
 ##FEATURES
 
 
-Kernel Version 3.10.108. (LATEST)
+Better memory optimisations.
+Improved some battery tweaks.
+New IO Schedulers.
+Fixed Random Freezes.
+Kernel Version 3.10.108.
 Supports one Touch Kernel Profiles.
 Change Profiles from Nougat Quick Settings Tile.
 Added Kernel Updater App.
